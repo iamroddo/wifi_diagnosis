@@ -1,0 +1,205 @@
+export type Lang = 'en' | 'de'
+
+const translations = {
+  en: {
+    // Header
+    subtitle: 'Browser-based network diagnostic — no software installation required',
+    // About box
+    aboutTitle: 'About this diagnostic',
+    aboutItem1: 'Runs entirely in your browser — no app or extension needed',
+    aboutItem2: 'No special browser permissions required',
+    aboutItem3: 'Measures your connection to the local network and the internet',
+    aboutItem4: 'Approximate data transferred: <strong>~70 MB</strong> (download + upload tests)',
+    // Controls
+    btnStart: 'Run Diagnostics',
+    btnStop: 'Stop',
+    btnSendReport: 'Send Report',
+    // Status messages
+    statusReady: 'Ready to start',
+    statusStopped: 'Stopped',
+    statusStartingSession: 'Starting session…',
+    statusConnecting: 'Connecting…',
+    statusWsFallback: 'WebSocket unavailable — using HTTP fallback',
+    statusMeasuringLanLatency: 'Measuring LAN latency…',
+    statusMeasuringDownload: 'Measuring download…',
+    statusRunningDownload: 'Running download test…',
+    statusMeasuringUpload: 'Measuring upload…',
+    statusMeasuringInternetLatency: 'Measuring internet latency…',
+    statusFetchingWifi: 'Fetching Wi-Fi information…',
+    statusComplete: 'Diagnostic complete',
+    statusError: 'Error',
+    // Result sections
+    sectionConnectionInfo: 'Connection Info',
+    sectionWifi: 'Wi-Fi (reported by UniFi)',
+    wifiSourceNote: 'These values are reported by the wireless infrastructure, not measured by your browser.',
+    sectionLan: 'LAN Performance',
+    lanSourceNote: 'Measured between your device and the diagnostic server on your local network.',
+    sectionThroughput: 'Throughput',
+    throughputSourceNote: 'Download and upload speed to the local diagnostic server.',
+    sectionInternet: 'Internet',
+    internetSourceNote: 'Latency from your device to the internet. A slow internet result with a healthy LAN result suggests a problem beyond the local network.',
+    sectionAssessment: 'Assessment',
+    // Metric labels
+    metricIp: 'Your IP',
+    metricCorrelation: 'Correlation',
+    metricSsid: 'SSID',
+    metricAp: 'AP',
+    metricBand: 'Band',
+    metricChannel: 'Channel',
+    metricRssi: 'UniFi RSSI',
+    metricTxRate: 'TX Rate',
+    metricRxRate: 'RX Rate',
+    metricRetries: 'Retries',
+    metricSatisfaction: 'Satisfaction',
+    metricMin: 'Min',
+    metricAvg: 'Avg',
+    metricMedian: 'Median',
+    metricP95: 'p95',
+    metricMax: 'Max',
+    metricJitter: 'Jitter',
+    metricLoss: 'Loss',
+    metricAvgLatency: 'Avg Latency',
+    metricDownload: 'Download',
+    metricPeakDl: 'Peak DL',
+    metricDlData: 'DL Data',
+    metricUpload: 'Upload',
+    metricPeakUl: 'Peak UL',
+    // Wi-Fi info fallback
+    wifiUnavailable: 'Wi-Fi information unavailable (correlation: ',
+    throughputUnavailable: 'Throughput test unavailable',
+    noFindings: 'No findings.',
+    // Assessment findings
+    findingVeryHighLan: 'Very high LAN latency',
+    findingElevatedLan: 'Elevated LAN latency',
+    findingGoodLan: 'Good LAN latency',
+    findingHighJitter: 'High jitter — connection unstable',
+    findingSignificantLoss: 'Significant packet loss',
+    findingSomeLoss: 'Some packet loss',
+    findingVeryWeakWifi: 'Very weak Wi-Fi signal',
+    findingWeakWifi: 'Weak Wi-Fi signal',
+    findingGoodWifi: 'Good Wi-Fi signal',
+    findingHighInetLowLan: 'High internet latency with healthy LAN — problem likely beyond your Wi-Fi',
+    // Footer
+    footerSessionId: 'Diagnostic session ID: ',
+    contactNeedHelp: 'Need help? Contact ',
+    // Email report
+    reportTitle: 'Wi-Fi Diagnostic Report',
+    reportSession: 'Session: ',
+    reportDate: 'Date: ',
+    reportWifi: 'Wi-Fi (from UniFi)',
+    reportLan: 'LAN Latency',
+    reportThroughput: 'Throughput',
+    reportInternet: 'Internet Latency',
+    emailSubject: 'Wi-Fi Diagnostic Report',
+  },
+  de: {
+    // Header
+    subtitle: 'Browser-basierte Netzwerkdiagnose — keine Softwareinstallation erforderlich',
+    // About box
+    aboutTitle: 'Über diese Diagnose',
+    aboutItem1: 'Läuft vollständig im Browser — keine App oder Erweiterung nötig',
+    aboutItem2: 'Keine speziellen Browser-Berechtigungen erforderlich',
+    aboutItem3: 'Misst die Verbindung zum lokalen Netzwerk und zum Internet',
+    aboutItem4: 'Ungefähr übertragene Datenmenge: <strong>~70 MB</strong> (Download- und Upload-Tests)',
+    // Controls
+    btnStart: 'Diagnose starten',
+    btnStop: 'Abbrechen',
+    btnSendReport: 'Bericht senden',
+    // Status messages
+    statusReady: 'Bereit',
+    statusStopped: 'Gestoppt',
+    statusStartingSession: 'Sitzung wird gestartet…',
+    statusConnecting: 'Verbindung wird aufgebaut…',
+    statusWsFallback: 'WebSocket nicht verfügbar — HTTP-Fallback wird verwendet',
+    statusMeasuringLanLatency: 'LAN-Latenz wird gemessen…',
+    statusMeasuringDownload: 'Download wird gemessen…',
+    statusRunningDownload: 'Download-Test läuft…',
+    statusMeasuringUpload: 'Upload wird gemessen…',
+    statusMeasuringInternetLatency: 'Internet-Latenz wird gemessen…',
+    statusFetchingWifi: 'WLAN-Informationen werden abgerufen…',
+    statusComplete: 'Diagnose abgeschlossen',
+    statusError: 'Fehler',
+    // Result sections
+    sectionConnectionInfo: 'Verbindungsinfo',
+    sectionWifi: 'WLAN (gemeldet von UniFi)',
+    wifiSourceNote: 'Diese Werte werden von der WLAN-Infrastruktur gemeldet, nicht vom Browser gemessen.',
+    sectionLan: 'LAN-Leistung',
+    lanSourceNote: 'Gemessen zwischen Ihrem Gerät und dem Diagnose-Server im lokalen Netzwerk.',
+    sectionThroughput: 'Durchsatz',
+    throughputSourceNote: 'Download- und Upload-Geschwindigkeit zum lokalen Diagnose-Server.',
+    sectionInternet: 'Internet',
+    internetSourceNote: 'Latenz von Ihrem Gerät zum Internet. Eine hohe Internet-Latenz bei gesundem LAN deutet auf ein Problem außerhalb des lokalen Netzwerks hin.',
+    sectionAssessment: 'Bewertung',
+    // Metric labels
+    metricIp: 'Ihre IP',
+    metricCorrelation: 'Zuordnung',
+    metricSsid: 'SSID',
+    metricAp: 'Access Point',
+    metricBand: 'Frequenzband',
+    metricChannel: 'Kanal',
+    metricRssi: 'UniFi RSSI',
+    metricTxRate: 'Senderate',
+    metricRxRate: 'Empfangsrate',
+    metricRetries: 'Wiederholungen',
+    metricSatisfaction: 'Zufriedenheit',
+    metricMin: 'Min',
+    metricAvg: 'Durchschn.',
+    metricMedian: 'Median',
+    metricP95: 'p95',
+    metricMax: 'Max',
+    metricJitter: 'Jitter',
+    metricLoss: 'Verlust',
+    metricAvgLatency: 'Ø Latenz',
+    metricDownload: 'Download',
+    metricPeakDl: 'Spitzen-DL',
+    metricDlData: 'DL-Daten',
+    metricUpload: 'Upload',
+    metricPeakUl: 'Spitzen-UL',
+    // Wi-Fi info fallback
+    wifiUnavailable: 'WLAN-Informationen nicht verfügbar (Zuordnung: ',
+    throughputUnavailable: 'Durchsatz-Test nicht verfügbar',
+    noFindings: 'Keine Auffälligkeiten.',
+    // Assessment findings
+    findingVeryHighLan: 'Sehr hohe LAN-Latenz',
+    findingElevatedLan: 'Erhöhte LAN-Latenz',
+    findingGoodLan: 'Gute LAN-Latenz',
+    findingHighJitter: 'Hoher Jitter — instabile Verbindung',
+    findingSignificantLoss: 'Erheblicher Paketverlust',
+    findingSomeLoss: 'Leichter Paketverlust',
+    findingVeryWeakWifi: 'Sehr schwaches WLAN-Signal',
+    findingWeakWifi: 'Schwaches WLAN-Signal',
+    findingGoodWifi: 'Gutes WLAN-Signal',
+    findingHighInetLowLan: 'Hohe Internet-Latenz bei gesundem LAN — Problem liegt wahrscheinlich außerhalb Ihres WLANs',
+    // Footer
+    footerSessionId: 'Diagnosesitzungs-ID: ',
+    contactNeedHelp: 'Hilfe benötigt? Kontaktieren Sie ',
+    // Email report
+    reportTitle: 'WLAN-Diagnosebericht',
+    reportSession: 'Sitzung: ',
+    reportDate: 'Datum: ',
+    reportWifi: 'WLAN (von UniFi)',
+    reportLan: 'LAN-Latenz',
+    reportThroughput: 'Durchsatz',
+    reportInternet: 'Internet-Latenz',
+    emailSubject: 'WLAN-Diagnosebericht',
+  },
+} as const
+
+type Translations = typeof translations.en
+type TranslationKey = keyof Translations
+
+let currentLang: Lang = (localStorage.getItem('lang') as Lang) || 'en'
+
+export function getLang(): Lang {
+  return currentLang
+}
+
+export function setLang(lang: Lang) {
+  currentLang = lang
+  localStorage.setItem('lang', lang)
+  document.documentElement.lang = lang
+}
+
+export function t(key: TranslationKey): string {
+  return translations[currentLang][key] as string
+}

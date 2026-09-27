@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wi-Fi Diagnostics</title>
+  <script type="module" crossorigin src="/assets/main-B-mBZUxo.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/style-yZxMtTAj.js">
+  <link rel="stylesheet" crossorigin href="/assets/style-BkyckZZ7.css">
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="header-top">
+        <h1>Wi-Fi Diagnostics</h1>
+        <div class="lang-switcher">
+          <button id="btn-lang-en" class="btn-lang active" aria-label="English">EN</button>
+          <button id="btn-lang-de" class="btn-lang" aria-label="Deutsch">DE</button>
+        </div>
+      </div>
+      <p id="subtitle" class="subtitle">Browser-based network diagnostic — no software installation required</p>
+    </header>
+
+    <section class="info-box">
+      <h2 id="about-title">About this diagnostic</h2>
+      <ul id="about-list">
+        <li id="about-item1">Runs entirely in your browser — no app or extension needed</li>
+        <li id="about-item2">No special browser permissions required</li>
+        <li id="about-item3">Measures your connection to the local network and the internet</li>
+        <li id="about-item4">Approximate data transferred: <strong>~70 MB</strong> (download + upload tests)</li>
+      </ul>
+    </section>
+
+    <section class="status-section">
+      <div id="status-bar" class="status-bar status-idle">Ready to start</div>
+    </section>
+
+    <section class="controls">
+      <button id="btn-start" class="btn btn-primary">Run Diagnostics</button>
+      <button id="btn-stop" class="btn btn-secondary" disabled>Stop</button>
+      <button id="btn-send-report" class="btn btn-secondary hidden">Send Report</button>
+    </section>
+
+    <section id="results" class="results hidden">
+
+      <div class="result-group">
+        <h2 id="section-connection-info">Connection Info</h2>
+        <div id="client-info" class="metric-grid"></div>
+      </div>
+
+      <div class="result-group">
+        <h2 id="section-wifi">Wi-Fi (reported by UniFi)</h2>
+        <p id="wifi-source-note" class="source-note">These values are reported by the wireless infrastructure, not measured by your browser.</p>
+        <div id="wifi-info" class="metric-grid"></div>
+      </div>
+
+      <div class="result-group">
+        <h2 id="section-lan">LAN Performance</h2>
+        <p id="lan-source-note" class="source-note">Measured between your device and the diagnostic server on your local network.</p>
+        <div id="lan-metrics" class="metric-grid"></div>
+      </div>
+
+      <div class="result-group">
+        <h2 id="section-throughput">Throughput</h2>
+        <p id="throughput-source-note" class="source-note">Download and upload speed to the local diagnostic server.</p>
+        <div id="throughput-metrics" class="metric-grid"></div>
+      </div>
+
+      <div class="result-group">
+        <h2 id="section-internet">Internet</h2>
+        <p id="internet-source-note" class="source-note">Latency from your device to the internet. A slow internet result with a healthy LAN result suggests a problem beyond the local network.</p>
+        <div id="internet-metrics" class="metric-grid"></div>
+      </div>
+
+      <div class="result-group">
+        <h2 id="section-assessment">Assessment</h2>
+        <div id="assessment"></div>
+      </div>
+
+    </section>
+
+    <footer class="footer">
+      <p id="footer-session"><span id="footer-session-label">Diagnostic session ID: </span><span id="session-id">—</span></p>
+      <p id="contact-info" class="contact-info hidden"></p>
+    </footer>
+  </div>
+
+</body>
+</html>
