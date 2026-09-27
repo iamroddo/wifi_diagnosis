@@ -19,6 +19,10 @@ The server runs as a Docker container on a Synology NAS using **macvlan** networ
 
 The server combines both into a single diagnostic session with an evidence-based assessment.
 
+**User-facing features:**
+- English / German language switcher — preference is remembered across visits
+- Optional email report button: when `CONTACT_EMAIL` is configured, a "Send Report" button appears after the diagnostic completes, pre-filling a mailto with session ID, Wi-Fi stats, latency, and throughput values
+
 ---
 
 ## Prerequisites — macvlan IP-preservation check
