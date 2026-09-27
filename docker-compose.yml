@@ -1,0 +1,36 @@
+services:
+  wifi-diagnostics:
+    image: wifi-diagnostics:latest
+    container_name: wifi-diagnostics
+    restart: unless-stopped
+    networks:
+      wifi-diag-net:
+        ipv4_address: 192.168.1.250
+    environment:
+      UNIFI_URL: ${UNIFI_URL}
+      UNIFI_USERNAME: ${UNIFI_USERNAME}
+      UNIFI_PASSWORD: ${UNIFI_PASSWORD}
+      UNIFI_VERIFY_TLS: ${UNIFI_VERIFY_TLS:-false}
+      UNIFI_SITE: ${UNIFI_SITE:-default}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATA_RETENTION_DAYS: ${DATA_RETENTION_DAYS:-30}
+      INTERNET_TEST_URL: ${INTERNET_TEST_URL:-https://one.one.one.one}
+      SITE_TITLE: ${SITE_TITLE:-Wi-Fi Diagnostics}
+      CONTACT_NAME: ${CONTACT_NAME:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+    volumes:
+      - /volume1/docker/wifi-diagnostics/data:/app/data
+
+networks:
+  wifi-diag-net:
+    external: true
+    # Create with:
+    # docker network create \
+    #   --driver macvlan \
+    #   --subnet=192.168.1.0/24 \
+    #   --gateway=192.168.1.1 \
+    #   --ip-range=192.168.1.250/31 \
+    #   --aux-address 'host=192.168.1.251' \
+    #   --opt parent=eth0 \
+    #   wifi-diag-net

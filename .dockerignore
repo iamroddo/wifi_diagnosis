@@ -1,0 +1,16 @@
+# Secrets and local config
+.env
+*.env.local
+
+# Build outputs
+frontend/dist/
+frontend/node_modules/
+cmd/server/frontend/
+*.out
+
+# Development data
+data/
+
+# Go
+*.test
+*.exe
