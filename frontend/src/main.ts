@@ -54,6 +54,21 @@ function formatRateKbps(bps: number): string {
   return mbps >= 1 ? `${mbps.toFixed(0)} Mbps` : `${(bps / 1e3).toFixed(0)} Kbps`
 }
 
+// ---- State ----
+
+const client = new DiagClient()
+let running = false
+let abortController: AbortController | null = null
+let contactEmail = ''
+let contactName = ''
+
+let lastSessionId = ''
+let lastLanLatency: LatencyResult | null = null
+let lastDownload: ThroughputResult | null = null
+let lastUpload: ThroughputResult | null = null
+let lastInternetLatency: LatencyResult | null = null
+let lastWifi: SessionResponse['wifi'] | null = null
+
 // ---- i18n: update all static UI text ----
 
 function applyTranslations() {
@@ -83,9 +98,9 @@ function applyTranslations() {
   el('btn-lang-en').classList.toggle('active', lang === 'en')
   el('btn-lang-de').classList.toggle('active', lang === 'de')
 
-  // Re-render status bar if idle (not mid-run)
+  // Re-render status bar only when idle
   const bar = el('status-bar')
-  if (bar.classList.contains('status-idle') && !running) {
+  if (bar.classList.contains('status-idle')) {
     bar.textContent = t('statusReady')
   }
 }
@@ -103,22 +118,6 @@ el('btn-lang-de').addEventListener('click', () => switchLang('de'))
 
 // Apply saved language on load
 switchLang(getLang())
-
-// ---- Main diagnostic flow ----
-
-const client = new DiagClient()
-let running = false
-let abortController: AbortController | null = null
-let contactEmail = ''
-let contactName = ''
-
-// Last completed diagnostic results for email report.
-let lastSessionId = ''
-let lastLanLatency: LatencyResult | null = null
-let lastDownload: ThroughputResult | null = null
-let lastUpload: ThroughputResult | null = null
-let lastInternetLatency: LatencyResult | null = null
-let lastWifi: SessionResponse['wifi'] | null = null
 
 el('btn-start').addEventListener('click', startDiagnostic)
 el('btn-stop').addEventListener('click', stopDiagnostic)
