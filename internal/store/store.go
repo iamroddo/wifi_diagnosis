@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // register sqlite driver
@@ -45,11 +46,13 @@ type DiagSession struct {
 	UserAgent string `json:"user_agent,omitempty"`
 
 	// Measurements — stored as JSON blobs
-	LANLatency  json.RawMessage `json:"lan_latency,omitempty"`
-	InternetResult json.RawMessage `json:"internet_result,omitempty"`
-	Download    json.RawMessage `json:"download,omitempty"`
-	Upload      json.RawMessage `json:"upload,omitempty"`
-	Stability   json.RawMessage `json:"stability,omitempty"`
+	LANLatency       json.RawMessage `json:"lan_latency,omitempty"`
+	InternetResult   json.RawMessage `json:"internet_result,omitempty"`
+	Download         json.RawMessage `json:"download,omitempty"`
+	Upload           json.RawMessage `json:"upload,omitempty"`
+	InternetDownload json.RawMessage `json:"internet_download,omitempty"`
+	InternetUpload   json.RawMessage `json:"internet_upload,omitempty"`
+	Stability        json.RawMessage `json:"stability,omitempty"`
 
 	// Assessment
 	Assessment json.RawMessage `json:"assessment,omitempty"`
@@ -108,6 +111,8 @@ func (s *Store) Save(ctx context.Context, sess *DiagSession) error {
 	inetJSON, _ := json.Marshal(sess.InternetResult)
 	dlJSON, _ := json.Marshal(sess.Download)
 	ulJSON, _ := json.Marshal(sess.Upload)
+	inetDlJSON, _ := json.Marshal(sess.InternetDownload)
+	inetUlJSON, _ := json.Marshal(sess.InternetUpload)
 	stJSON, _ := json.Marshal(sess.Stability)
 	asJSON, _ := json.Marshal(sess.Assessment)
 
@@ -118,9 +123,9 @@ func (s *Store) Save(ctx context.Context, sess *DiagSession) error {
 			client_mac, client_hostname, client_name, unifi_client_id, ua_validation,
 			ssid, ap_mac, band, channel, channel_width, rssi, tx_rate, rx_rate, retries, satisfaction,
 			user_agent,
-			lan_latency, internet_result, download, upload, stability, assessment,
+			lan_latency, internet_result, download, upload, internet_download, internet_upload, stability, assessment,
 			completed_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET
 			correlation_status=excluded.correlation_status,
 			correlation_at=excluded.correlation_at,
@@ -144,6 +149,8 @@ func (s *Store) Save(ctx context.Context, sess *DiagSession) error {
 			internet_result=excluded.internet_result,
 			download=excluded.download,
 			upload=excluded.upload,
+			internet_download=excluded.internet_download,
+			internet_upload=excluded.internet_upload,
 			stability=excluded.stability,
 			assessment=excluded.assessment,
 			completed_at=excluded.completed_at
@@ -154,7 +161,8 @@ func (s *Store) Save(ctx context.Context, sess *DiagSession) error {
 		sess.SSID, sess.APMAC, sess.Band, sess.Channel, sess.ChannelWidth, sess.RSSI,
 		sess.TXRate, sess.RXRate, sess.Retries, sess.Satisfaction,
 		sess.UserAgent,
-		string(lanJSON), string(inetJSON), string(dlJSON), string(ulJSON), string(stJSON), string(asJSON),
+		string(lanJSON), string(inetJSON), string(dlJSON), string(ulJSON),
+		string(inetDlJSON), string(inetUlJSON), string(stJSON), string(asJSON),
 		nullTime(sess.CompletedAt),
 	)
 	return err
@@ -224,7 +232,7 @@ const sessionColumns = `
 	client_mac, client_hostname, client_name, unifi_client_id, ua_validation,
 	ssid, ap_mac, band, channel, channel_width, rssi, tx_rate, rx_rate, retries, satisfaction,
 	user_agent,
-	lan_latency, internet_result, download, upload, stability, assessment,
+	lan_latency, internet_result, download, upload, internet_download, internet_upload, stability, assessment,
 	completed_at`
 
 type scanner interface {
@@ -234,7 +242,7 @@ type scanner interface {
 func scanSession(row scanner) (*DiagSession, error) {
 	var s DiagSession
 	var correlationAt, completedAt sql.NullString
-	var lanJSON, inetJSON, dlJSON, ulJSON, stJSON, asJSON sql.NullString
+	var lanJSON, inetJSON, dlJSON, ulJSON, inetDlJSON, inetUlJSON, stJSON, asJSON sql.NullString
 
 	err := row.Scan(
 		&s.ID, &s.CreatedAt, &s.ClientIP,
@@ -243,7 +251,7 @@ func scanSession(row scanner) (*DiagSession, error) {
 		&s.SSID, &s.APMAC, &s.Band, &s.Channel, &s.ChannelWidth, &s.RSSI,
 		&s.TXRate, &s.RXRate, &s.Retries, &s.Satisfaction,
 		&s.UserAgent,
-		&lanJSON, &inetJSON, &dlJSON, &ulJSON, &stJSON, &asJSON,
+		&lanJSON, &inetJSON, &dlJSON, &ulJSON, &inetDlJSON, &inetUlJSON, &stJSON, &asJSON,
 		&completedAt,
 	)
 	if err != nil {
@@ -267,6 +275,12 @@ func scanSession(row scanner) (*DiagSession, error) {
 	}
 	if ulJSON.Valid {
 		s.Upload = json.RawMessage(ulJSON.String)
+	}
+	if inetDlJSON.Valid {
+		s.InternetDownload = json.RawMessage(inetDlJSON.String)
+	}
+	if inetUlJSON.Valid {
+		s.InternetUpload = json.RawMessage(inetUlJSON.String)
 	}
 	if stJSON.Valid {
 		s.Stability = json.RawMessage(stJSON.String)
@@ -312,6 +326,8 @@ func (s *Store) migrate() error {
 		internet_result    TEXT,
 		download           TEXT,
 		upload             TEXT,
+		internet_download  TEXT,
+		internet_upload    TEXT,
 		stability          TEXT,
 		assessment         TEXT,
 		completed_at       DATETIME
@@ -319,5 +335,21 @@ func (s *Store) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
 	CREATE INDEX IF NOT EXISTS idx_sessions_client_ip  ON sessions(client_ip);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Add columns introduced after initial schema (idempotent — SQLite ignores duplicate column errors).
+	for _, col := range []string{
+		"ALTER TABLE sessions ADD COLUMN internet_download TEXT",
+		"ALTER TABLE sessions ADD COLUMN internet_upload TEXT",
+	} {
+		if _, err := s.db.Exec(col); err != nil && !isDuplicateColumnErr(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func isDuplicateColumnErr(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "duplicate column name")
 }

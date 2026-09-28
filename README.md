@@ -9,7 +9,8 @@ The server runs as a Docker container on a Synology NAS using **macvlan** networ
 **Browser measures:**
 - LAN latency (min/avg/median/p95/max), jitter, packet loss
 - Download and upload throughput (to the local diagnostic server)
-- Internet latency (to a configurable external endpoint)
+- Internet latency (min/avg/median/p95/max), jitter, packet loss (to a configurable external endpoint)
+- Internet download and upload speed (measured directly to Cloudflare's servers — no server involvement)
 - Connection stability
 
 **UniFi provides:**
@@ -21,7 +22,8 @@ The server combines both into a single diagnostic session with an evidence-based
 
 **User-facing features:**
 - English / German language switcher — preference is remembered across visits
-- Optional email report button: when `CONTACT_EMAIL` is configured, a "Send Report" button appears after the diagnostic completes, pre-filling a mailto with session ID, Wi-Fi stats, latency, and throughput values
+- Optional email report button: when `CONTACT_EMAIL` is configured, a "Send Report" button appears after the diagnostic completes, pre-filling a mailto with session ID, Wi-Fi stats, LAN latency, throughput, internet latency, and internet speed values
+- Assessment section with evidence-based findings covering LAN latency, jitter, packet loss, Wi-Fi signal, internet latency, and internet speed
 
 ---
 
@@ -174,6 +176,10 @@ Go server (macvlan 192.168.1.250)
      ├── diagengine: deterministic evidence rules
      ├── store: SQLite session persistence
      └── httpapi: routes + /healthz + /admin
+
+Browser also fetches directly:
+     ├── speed.cloudflare.com/__down  (internet download speed)
+     └── speed.cloudflare.com/__up   (internet upload speed)
 ```
 
 ### Notes

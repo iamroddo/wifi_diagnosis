@@ -101,6 +101,91 @@ export class DiagClient {
     return computeLatencyStats(samples, sent)
   }
 
+  /** Measure internet download speed via Cloudflare speed test CDN. */
+  async measureInternetDownload(onProgress?: OnProgress): Promise<ThroughputResult | null> {
+    const url = 'https://speed.cloudflare.com/__down?bytes=25000000'
+    const warmupMs = 2000
+
+    const t0 = performance.now()
+    let totalBytes = 0
+    let peakMbps = 0
+
+    try {
+      const resp = await fetch(url, { cache: 'no-store' })
+      if (!resp.body) {
+        // Fallback: read as arrayBuffer if streaming not available
+        const buf = await resp.arrayBuffer()
+        totalBytes = buf.byteLength
+      } else {
+        const reader = resp.body.getReader()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          totalBytes += value.byteLength
+          const elapsed = performance.now() - t0
+          const mbps = (totalBytes * 8) / elapsed / 1000
+          if (mbps > peakMbps) peakMbps = mbps
+          onProgress?.(`Internet download: ${mbps.toFixed(1)} Mbps`)
+        }
+      }
+    } catch {
+      if (totalBytes === 0) return null
+    }
+
+    const elapsed = (performance.now() - t0) / 1000
+    const warmupSecs = warmupMs / 1000
+    const measuredBytes = elapsed > warmupSecs
+      ? Math.max(0, totalBytes - Math.floor(totalBytes * warmupSecs / elapsed))
+      : totalBytes
+    const measuredDur = Math.max(0.1, elapsed > warmupSecs ? elapsed - warmupSecs : elapsed)
+    const avgMbps = (measuredBytes * 8) / measuredDur / 1e6
+    if (peakMbps === 0) peakMbps = (totalBytes * 8) / elapsed / 1e6
+
+    return {
+      mbps_avg: round2(avgMbps),
+      mbps_peak: round2(peakMbps),
+      bytes_total: totalBytes,
+      duration_secs: round2(elapsed),
+      warmup_ms: warmupMs,
+    }
+  }
+
+  /** Measure internet upload speed via Cloudflare speed test CDN. */
+  async measureInternetUpload(onProgress?: OnProgress): Promise<ThroughputResult | null> {
+    const targetBytes = 10_000_000
+    const warmupMs = 1000
+    const chunk = new Uint8Array(targetBytes)
+    const blob = new Blob([chunk])
+
+    const t0 = performance.now()
+    try {
+      onProgress?.(`Internet upload: sending ${(targetBytes / 1e6).toFixed(0)} MB…`)
+      await fetch('https://speed.cloudflare.com/__up', {
+        method: 'POST',
+        body: blob,
+        cache: 'no-store',
+      })
+    } catch {
+      return null
+    }
+
+    const elapsed = (performance.now() - t0) / 1000
+    const warmupSecs = warmupMs / 1000
+    const measuredBytes = Math.max(0, targetBytes - Math.floor(targetBytes * warmupSecs / elapsed))
+    const measuredDur = Math.max(0.1, elapsed - warmupSecs)
+    const avgMbps = (measuredBytes * 8) / measuredDur / 1e6
+    const peakMbps = (targetBytes * 8) / elapsed / 1e6
+
+    onProgress?.(`Internet upload: ${avgMbps.toFixed(1)} Mbps`)
+    return {
+      mbps_avg: round2(avgMbps),
+      mbps_peak: round2(peakMbps),
+      bytes_total: targetBytes,
+      duration_secs: round2(elapsed),
+      warmup_ms: warmupMs,
+    }
+  }
+
   /** Measure internet latency via a configurable HTTP endpoint. */
   async measureInternetLatency(testUrl: string, onProgress?: OnProgress): Promise<LatencyResult> {
     const samples: number[] = []

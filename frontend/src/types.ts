@@ -106,6 +106,8 @@ export interface DiagSession {
   internet_result?: LatencyResult
   download?: ThroughputResult
   upload?: ThroughputResult
+  internet_download?: ThroughputResult
+  internet_upload?: ThroughputResult
   stability?: unknown
   assessment?: Assessment
   completed_at?: string

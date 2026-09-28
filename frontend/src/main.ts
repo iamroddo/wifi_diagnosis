@@ -67,6 +67,8 @@ let lastLanLatency: LatencyResult | null = null
 let lastDownload: ThroughputResult | null = null
 let lastUpload: ThroughputResult | null = null
 let lastInternetLatency: LatencyResult | null = null
+let lastInternetDownload: ThroughputResult | null = null
+let lastInternetUpload: ThroughputResult | null = null
 let lastWifi: SessionResponse['wifi'] | null = null
 
 // ---- i18n: update all static UI text ----
@@ -90,6 +92,8 @@ function applyTranslations() {
   el('throughput-source-note').textContent = t('throughputSourceNote')
   el('section-internet').textContent = t('sectionInternet')
   el('internet-source-note').textContent = t('internetSourceNote')
+  el('section-internet-speed').textContent = t('sectionInternetSpeed')
+  el('internet-speed-source-note').textContent = t('internetSpeedSourceNote')
   el('section-assessment').textContent = t('sectionAssessment')
   el('footer-session-label').textContent = t('footerSessionId')
 
@@ -239,7 +243,24 @@ async function runDiagnostic(signal: AbortSignal) {
 
   checkAbort(signal)
 
-  // 7. Poll for UniFi correlation
+  // 7. Internet download
+  setStatus(t('statusMeasuringInternetDownload'), 'running')
+  el('internet-speed-metrics').innerHTML = `<p style="color:var(--text-muted)">${t('statusRunningInternetDownload')}</p>`
+  const internetDownload = await client.measureInternetDownload(msg => setStatus(msg, 'running'))
+  lastInternetDownload = internetDownload
+  renderInternetSpeed(internetDownload, null)
+
+  checkAbort(signal)
+
+  // 8. Internet upload
+  setStatus(t('statusMeasuringInternetUpload'), 'running')
+  const internetUpload = await client.measureInternetUpload(msg => setStatus(msg, 'running'))
+  lastInternetUpload = internetUpload
+  renderInternetSpeed(internetDownload, internetUpload)
+
+  checkAbort(signal)
+
+  // 9. Poll for UniFi correlation
   setStatus(t('statusFetchingWifi'), 'running')
   const sessionData = await pollSession(sess.session_id, 12000)
   if (sessionData) {
@@ -249,8 +270,11 @@ async function runDiagnostic(signal: AbortSignal) {
     else el('wifi-info').innerHTML = `<p style="color:var(--text-muted)">${t('wifiUnavailable')}${sessionData.correlation_status})</p>`
   }
 
-  // 8. Local assessment
+  // 10. Local assessment
   runLocalAssessment(lanLatency, internetLatency, sessionData?.wifi ?? null)
+
+  // 11. Submit results to server
+  await submitResults(sess.session_id, lanLatency, internetLatency, download, upload, internetDownload, internetUpload)
 
   setStatus(t('statusComplete'), 'done')
   signal.removeEventListener('abort', onAbort)
@@ -311,10 +335,16 @@ function renderLatency(r: LatencyResult) {
 
 function renderInternetLatency(r: LatencyResult) {
   const avgClass = r.avg_ms < 50 ? 'ok' : r.avg_ms < 150 ? 'warning' : 'critical'
+  const jitterClass = r.jitter_ms < 15 ? 'ok' : r.jitter_ms < 30 ? 'warning' : 'critical'
+  const lossClass = r.loss_pct === 0 ? 'ok' : r.loss_pct < 2 ? 'warning' : 'critical'
   el('internet-metrics').innerHTML =
-    metricHTML(t('metricAvgLatency'), r.avg_ms.toFixed(1), 'ms', avgClass) +
+    metricHTML(t('metricMin'), r.min_ms.toFixed(1), 'ms') +
+    metricHTML(t('metricAvg'), r.avg_ms.toFixed(1), 'ms', avgClass) +
+    metricHTML(t('metricMedian'), r.median_ms.toFixed(1), 'ms') +
     metricHTML(t('metricP95'), r.p95_ms.toFixed(1), 'ms') +
-    metricHTML(t('metricLoss'), r.loss_pct.toFixed(1), '%')
+    metricHTML(t('metricMax'), r.max_ms.toFixed(1), 'ms') +
+    metricHTML(t('metricJitter'), r.jitter_ms.toFixed(1), 'ms', jitterClass) +
+    metricHTML(t('metricLoss'), r.loss_pct.toFixed(1), '%', lossClass)
 }
 
 function renderThroughput(dl: ThroughputResult | null, ul: ThroughputResult | null) {
@@ -332,6 +362,47 @@ function renderThroughput(dl: ThroughputResult | null, ul: ThroughputResult | nu
   }
   if (!dl && !ul) html = `<p style="color:var(--text-muted)">${t('throughputUnavailable')}</p>`
   el('throughput-metrics').innerHTML = html
+}
+
+function renderInternetSpeed(dl: ThroughputResult | null, ul: ThroughputResult | null) {
+  let html = ''
+  if (dl) {
+    const cls = dl.mbps_avg > 25 ? 'ok' : dl.mbps_avg > 5 ? 'warning' : 'critical'
+    html += metricHTML(t('metricInternetDownload'), dl.mbps_avg.toFixed(1), 'Mbps', cls)
+    html += metricHTML(t('metricPeakDl'), dl.mbps_peak.toFixed(1), 'Mbps')
+  }
+  if (ul) {
+    const cls = ul.mbps_avg > 10 ? 'ok' : ul.mbps_avg > 2 ? 'warning' : 'critical'
+    html += metricHTML(t('metricInternetUpload'), ul.mbps_avg.toFixed(1), 'Mbps', cls)
+    html += metricHTML(t('metricPeakUl'), ul.mbps_peak.toFixed(1), 'Mbps')
+  }
+  if (!dl && !ul) html = `<p style="color:var(--text-muted)">${t('internetSpeedUnavailable')}</p>`
+  el('internet-speed-metrics').innerHTML = html
+}
+
+async function submitResults(
+  sessionId: string,
+  lan: LatencyResult,
+  inet: LatencyResult,
+  download: ThroughputResult | null,
+  upload: ThroughputResult | null,
+  internetDownload: ThroughputResult | null,
+  internetUpload: ThroughputResult | null,
+) {
+  try {
+    await fetch(`/api/session/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lan_latency: lan,
+        internet_result: inet,
+        download: download ?? undefined,
+        upload: upload ?? undefined,
+        internet_download: internetDownload ?? undefined,
+        internet_upload: internetUpload ?? undefined,
+      }),
+    })
+  } catch { /* non-fatal — results are still shown in UI */ }
 }
 
 function runLocalAssessment(
@@ -369,8 +440,44 @@ function runLocalAssessment(
     }
   }
 
-  if (inet.avg_ms > 150 && lan.avg_ms < 20) {
+  // Internet latency findings
+  if (inet.avg_ms > 150) {
+    findings.push({ sev: 'critical', desc: t('findingVeryHighInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
+  } else if (inet.avg_ms > 80) {
+    findings.push({ sev: 'warning', desc: t('findingElevatedInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
+  } else {
+    findings.push({ sev: 'ok', desc: t('findingGoodInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
+  }
+
+  if (inet.jitter_ms > 30) {
+    findings.push({ sev: 'warning', desc: t('findingHighInetJitter'), evidence: `${inet.jitter_ms.toFixed(1)} ms` })
+  }
+
+  if (inet.avg_ms > 80 && lan.avg_ms < 20) {
     findings.push({ sev: 'info', desc: t('findingHighInetLowLan'), evidence: `internet avg ${inet.avg_ms.toFixed(1)} ms vs LAN avg ${lan.avg_ms.toFixed(1)} ms` })
+  }
+
+  // Download/upload speed findings (internet speed)
+  if (lastInternetDownload) {
+    const dl = lastInternetDownload.mbps_avg
+    if (dl < 5) {
+      findings.push({ sev: 'critical', desc: t('findingVerySlowDownload'), evidence: `${dl.toFixed(1)} Mbps` })
+    } else if (dl < 25) {
+      findings.push({ sev: 'warning', desc: t('findingSlowDownload'), evidence: `${dl.toFixed(1)} Mbps` })
+    } else {
+      findings.push({ sev: 'ok', desc: t('findingGoodDownload'), evidence: `${dl.toFixed(1)} Mbps` })
+    }
+  }
+
+  if (lastInternetUpload) {
+    const ul = lastInternetUpload.mbps_avg
+    if (ul < 2) {
+      findings.push({ sev: 'critical', desc: t('findingVerySlowUpload'), evidence: `${ul.toFixed(1)} Mbps` })
+    } else if (ul < 10) {
+      findings.push({ sev: 'warning', desc: t('findingSlowUpload'), evidence: `${ul.toFixed(1)} Mbps` })
+    } else {
+      findings.push({ sev: 'ok', desc: t('findingGoodUpload'), evidence: `${ul.toFixed(1)} Mbps` })
+    }
   }
 
   const html = findings.map(f => `
@@ -417,9 +524,18 @@ function sendReport() {
     lines.push('')
   }
 
+  if (lastInternetDownload || lastInternetUpload) {
+    lines.push(t('reportInternetSpeed'))
+    if (lastInternetDownload) lines.push(`  Download: ${lastInternetDownload.mbps_avg.toFixed(1)} Mbps`)
+    if (lastInternetUpload) lines.push(`  Upload: ${lastInternetUpload.mbps_avg.toFixed(1)} Mbps`)
+    lines.push('')
+  }
+
   if (lastInternetLatency) {
+    const i = lastInternetLatency
     lines.push(t('reportInternet'))
-    lines.push(`  Avg: ${lastInternetLatency.avg_ms.toFixed(1)} ms | Loss: ${lastInternetLatency.loss_pct.toFixed(1)}%`)
+    lines.push(`  Avg: ${i.avg_ms.toFixed(1)} ms | Median: ${i.median_ms.toFixed(1)} ms | p95: ${i.p95_ms.toFixed(1)} ms`)
+    lines.push(`  Jitter: ${i.jitter_ms.toFixed(1)} ms | Loss: ${i.loss_pct.toFixed(1)}%`)
     lines.push('')
   }
 

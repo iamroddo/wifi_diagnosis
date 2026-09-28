@@ -119,6 +119,10 @@ func (s *Server) handleSessionStart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSessionGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPatch {
+		s.handleSessionComplete(w, r)
+		return
+	}
 	id := r.URL.Path[len("/api/session/"):]
 	if id == "" {
 		http.Error(w, "session id required", http.StatusBadRequest)
@@ -203,6 +207,87 @@ func (s *Server) handleAdminSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sessions) //nolint:errcheck
+}
+
+func (s *Server) handleSessionComplete(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/api/session/"):]
+	if id == "" {
+		http.Error(w, "session id required", http.StatusBadRequest)
+		return
+	}
+
+	var body struct {
+		LANLatency       json.RawMessage `json:"lan_latency"`
+		InternetResult   json.RawMessage `json:"internet_result"`
+		Download         json.RawMessage `json:"download"`
+		Upload           json.RawMessage `json:"upload"`
+		InternetDownload json.RawMessage `json:"internet_download"`
+		InternetUpload   json.RawMessage `json:"internet_upload"`
+		Assessment       json.RawMessage `json:"assessment"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	sess := s.sessions.Get(id)
+
+	var rec store.DiagSession
+	rec.ID = id
+	rec.CreatedAt = time.Now()
+	rec.CorrelationStatus = "unavailable"
+
+	if sess != nil {
+		snap := sess.Snapshot()
+		rec.ClientIP = sess.ClientIP
+		rec.UserAgent = sess.UserAgent
+		rec.CreatedAt = sess.CreatedAt
+		rec.CorrelationStatus = string(snap.CorrelationStatus)
+		rec.CorrelationAt = snap.CorrelationAt
+		rec.UAValidation = snap.UAValidation
+		if snap.UnifiClient != nil {
+			cl := snap.UnifiClient
+			rec.ClientMAC = cl.MAC
+			rec.ClientHostname = cl.DisplayName()
+			rec.SSID = cl.ESSID
+			rec.APMAC = cl.APMAC
+			rec.Band = cl.Band
+			rec.Channel = cl.Channel
+			rec.ChannelWidth = cl.ChannelWidth
+			rec.RSSI = cl.RSSI
+			rec.TXRate = cl.TXRate
+			rec.RXRate = cl.RXRate
+			rec.Retries = cl.Retries
+			rec.Satisfaction = cl.Satisfaction
+		}
+	} else {
+		stored, err := s.store.Get(r.Context(), id)
+		if err == nil {
+			rec = *stored
+		}
+	}
+
+	rec.LANLatency = body.LANLatency
+	rec.InternetResult = body.InternetResult
+	rec.Download = body.Download
+	rec.Upload = body.Upload
+	rec.InternetDownload = body.InternetDownload
+	rec.InternetUpload = body.InternetUpload
+	rec.Assessment = body.Assessment
+	rec.CompletedAt = time.Now()
+
+	if err := s.store.Save(r.Context(), &rec); err != nil {
+		s.logger.Error("session: save failed", "session_id", id, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if sess != nil {
+		s.sessions.Remove(id)
+	}
+
+	s.logger.Info("session: completed", "session_id", id)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
