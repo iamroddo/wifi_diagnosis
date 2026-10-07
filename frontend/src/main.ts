@@ -319,16 +319,18 @@ function renderClientInfo(ip: string, corrStatus: string) {
 function renderWifiInfo(wifi: SessionResponse['wifi']) {
   if (!wifi) return
   const rssiClass = wifi.rssi_dbm > -65 ? 'ok' : wifi.rssi_dbm > -75 ? 'warning' : 'critical'
+  const rateClass = (bps: number) => bps > 50e6 ? 'ok' : bps > 10e6 ? 'warning' : 'critical'
+  const satClass = wifi.satisfaction >= 80 ? 'ok' : wifi.satisfaction >= 50 ? 'warning' : 'critical'
   el('wifi-info').innerHTML =
     metricHTML(t('metricSsid'), wifi.ssid || '—') +
     metricHTML(t('metricAp'), wifi.ap_name || wifi.ap_mac || '—') +
     metricHTML(t('metricBand'), wifi.band || '—') +
     metricHTML(t('metricChannel'), wifi.channel ? String(wifi.channel) : '—', wifi.channel_width ? `(${wifi.channel_width} MHz)` : '') +
     metricHTML(t('metricRssi'), wifi.rssi_dbm ? String(wifi.rssi_dbm) : '—', 'dBm', rssiClass) +
-    metricHTML(t('metricTxRate'), formatRateKbps(wifi.tx_rate_bps)) +
-    metricHTML(t('metricRxRate'), formatRateKbps(wifi.rx_rate_bps)) +
+    metricHTML(t('metricTxRate'), formatRateKbps(wifi.tx_rate_bps), '', wifi.tx_rate_bps ? rateClass(wifi.tx_rate_bps) : '') +
+    metricHTML(t('metricRxRate'), formatRateKbps(wifi.rx_rate_bps), '', wifi.rx_rate_bps ? rateClass(wifi.rx_rate_bps) : '') +
     metricHTML(t('metricRetries'), wifi.retries !== undefined ? `${wifi.retries}%` : '—') +
-    metricHTML(t('metricSatisfaction'), wifi.satisfaction !== undefined ? `${wifi.satisfaction}%` : '—') +
+    metricHTML(t('metricSatisfaction'), wifi.satisfaction !== undefined ? `${wifi.satisfaction}%` : '—', '', wifi.satisfaction !== undefined ? satClass : '') +
     `<p class="rssi-explain source-note">${t('rssiExplain')}</p>`
 }
 
@@ -451,6 +453,44 @@ function runLocalAssessment(
       findings.push({ sev: 'warning', desc: t('findingWeakWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm`, tip: t('tipWeakWifi') })
     } else {
       findings.push({ sev: 'ok', desc: t('findingGoodWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm` })
+    }
+  }
+
+  if (wifi && wifi.tx_rate_bps) {
+    if (wifi.tx_rate_bps <= 10e6) {
+      findings.push({ sev: 'critical', desc: t('findingVeryLowTxRate'), evidence: `TX: ${formatRateKbps(wifi.tx_rate_bps)}`, tip: t('tipVeryLowTxRate') })
+    } else if (wifi.tx_rate_bps <= 50e6) {
+      findings.push({ sev: 'warning', desc: t('findingLowTxRate'), evidence: `TX: ${formatRateKbps(wifi.tx_rate_bps)}`, tip: t('tipLowTxRate') })
+    } else {
+      findings.push({ sev: 'ok', desc: t('findingGoodTxRate'), evidence: `TX: ${formatRateKbps(wifi.tx_rate_bps)}` })
+    }
+  }
+
+  if (wifi && wifi.rx_rate_bps) {
+    if (wifi.rx_rate_bps <= 10e6) {
+      findings.push({ sev: 'critical', desc: t('findingVeryLowRxRate'), evidence: `RX: ${formatRateKbps(wifi.rx_rate_bps)}`, tip: t('tipVeryLowRxRate') })
+    } else if (wifi.rx_rate_bps <= 50e6) {
+      findings.push({ sev: 'warning', desc: t('findingLowRxRate'), evidence: `RX: ${formatRateKbps(wifi.rx_rate_bps)}`, tip: t('tipLowRxRate') })
+    } else {
+      findings.push({ sev: 'ok', desc: t('findingGoodRxRate'), evidence: `RX: ${formatRateKbps(wifi.rx_rate_bps)}` })
+    }
+  }
+
+  if (wifi && wifi.retries !== undefined) {
+    if (wifi.retries > 15) {
+      findings.push({ sev: 'critical', desc: t('findingVeryHighRetries'), evidence: `${wifi.retries}%`, tip: t('tipVeryHighRetries') })
+    } else if (wifi.retries > 5) {
+      findings.push({ sev: 'warning', desc: t('findingHighRetries'), evidence: `${wifi.retries}%`, tip: t('tipHighRetries') })
+    }
+  }
+
+  if (wifi && wifi.satisfaction !== undefined) {
+    if (wifi.satisfaction < 50) {
+      findings.push({ sev: 'critical', desc: t('findingVeryLowSatisfaction'), evidence: `${wifi.satisfaction}%`, tip: t('tipVeryLowSatisfaction') })
+    } else if (wifi.satisfaction < 80) {
+      findings.push({ sev: 'warning', desc: t('findingLowSatisfaction'), evidence: `${wifi.satisfaction}%`, tip: t('tipLowSatisfaction') })
+    } else {
+      findings.push({ sev: 'ok', desc: t('findingGoodSatisfaction'), evidence: `${wifi.satisfaction}%` })
     }
   }
 
