@@ -147,6 +147,8 @@ body {
 .metric.warning  .metric-value { color: var(--warning); }
 .metric.critical .metric-value { color: var(--critical); }
 
+.rssi-explain { grid-column: 1 / -1; margin-top: .25rem; }
+
 /* ===== Assessment ===== */
 .assessment-summary {
   font-size: 1rem;
@@ -177,6 +179,7 @@ body {
 .finding-icon { font-size: 1rem; flex-shrink: 0; margin-top: .1rem; }
 .finding-text { }
 .finding-evidence { font-size: .8rem; opacity: .8; margin-top: .15rem; }
+.finding-tip { font-size: .8rem; opacity: .75; margin-top: .35rem; padding-top: .3rem; border-top: 1px solid currentColor; border-top-color: color-mix(in srgb, currentColor 25%, transparent); font-style: italic; }
 
 /* ===== Admin ===== */
 .session-card {

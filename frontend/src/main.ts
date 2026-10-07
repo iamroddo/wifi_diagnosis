@@ -328,7 +328,8 @@ function renderWifiInfo(wifi: SessionResponse['wifi']) {
     metricHTML(t('metricTxRate'), formatRateKbps(wifi.tx_rate_bps)) +
     metricHTML(t('metricRxRate'), formatRateKbps(wifi.rx_rate_bps)) +
     metricHTML(t('metricRetries'), wifi.retries !== undefined ? `${wifi.retries}%` : '—') +
-    metricHTML(t('metricSatisfaction'), wifi.satisfaction !== undefined ? `${wifi.satisfaction}%` : '—')
+    metricHTML(t('metricSatisfaction'), wifi.satisfaction !== undefined ? `${wifi.satisfaction}%` : '—') +
+    `<p class="rssi-explain source-note">${t('rssiExplain')}</p>`
 }
 
 function renderLatency(r: LatencyResult) {
@@ -423,31 +424,31 @@ function runLocalAssessment(
   inet: LatencyResult,
   wifi: SessionResponse['wifi'] | null
 ) {
-  const findings: { sev: Severity; desc: string; evidence: string }[] = []
+  const findings: { sev: Severity; desc: string; evidence: string; tip?: string }[] = []
 
   if (lan.avg_ms > 100) {
-    findings.push({ sev: 'critical', desc: t('findingVeryHighLan'), evidence: `avg ${lan.avg_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'critical', desc: t('findingVeryHighLan'), evidence: `avg ${lan.avg_ms.toFixed(1)} ms`, tip: t('tipVeryHighLan') })
   } else if (lan.avg_ms > 30) {
-    findings.push({ sev: 'warning', desc: t('findingElevatedLan'), evidence: `avg ${lan.avg_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'warning', desc: t('findingElevatedLan'), evidence: `avg ${lan.avg_ms.toFixed(1)} ms`, tip: t('tipElevatedLan') })
   } else {
     findings.push({ sev: 'ok', desc: t('findingGoodLan'), evidence: `avg ${lan.avg_ms.toFixed(1)} ms` })
   }
 
   if (lan.jitter_ms > 20) {
-    findings.push({ sev: 'warning', desc: t('findingHighJitter'), evidence: `${lan.jitter_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'warning', desc: t('findingHighJitter'), evidence: `${lan.jitter_ms.toFixed(1)} ms`, tip: t('tipHighJitter') })
   }
 
   if (lan.loss_pct > 5) {
-    findings.push({ sev: 'critical', desc: t('findingSignificantLoss'), evidence: `${lan.loss_pct.toFixed(1)}%` })
+    findings.push({ sev: 'critical', desc: t('findingSignificantLoss'), evidence: `${lan.loss_pct.toFixed(1)}%`, tip: t('tipSignificantLoss') })
   } else if (lan.loss_pct > 1) {
-    findings.push({ sev: 'warning', desc: t('findingSomeLoss'), evidence: `${lan.loss_pct.toFixed(1)}%` })
+    findings.push({ sev: 'warning', desc: t('findingSomeLoss'), evidence: `${lan.loss_pct.toFixed(1)}%`, tip: t('tipSomeLoss') })
   }
 
   if (wifi && wifi.rssi_dbm) {
     if (wifi.rssi_dbm < -85) {
-      findings.push({ sev: 'critical', desc: t('findingVeryWeakWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm` })
+      findings.push({ sev: 'critical', desc: t('findingVeryWeakWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm`, tip: t('tipVeryWeakWifi') })
     } else if (wifi.rssi_dbm < -75) {
-      findings.push({ sev: 'warning', desc: t('findingWeakWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm` })
+      findings.push({ sev: 'warning', desc: t('findingWeakWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm`, tip: t('tipWeakWifi') })
     } else {
       findings.push({ sev: 'ok', desc: t('findingGoodWifi'), evidence: `UniFi RSSI: ${wifi.rssi_dbm} dBm` })
     }
@@ -455,15 +456,15 @@ function runLocalAssessment(
 
   // Internet latency findings
   if (inet.avg_ms > 150) {
-    findings.push({ sev: 'critical', desc: t('findingVeryHighInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'critical', desc: t('findingVeryHighInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms`, tip: t('tipVeryHighInet') })
   } else if (inet.avg_ms > 80) {
-    findings.push({ sev: 'warning', desc: t('findingElevatedInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'warning', desc: t('findingElevatedInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms`, tip: t('tipElevatedInet') })
   } else {
     findings.push({ sev: 'ok', desc: t('findingGoodInet'), evidence: `avg ${inet.avg_ms.toFixed(1)} ms` })
   }
 
   if (inet.jitter_ms > 30) {
-    findings.push({ sev: 'warning', desc: t('findingHighInetJitter'), evidence: `${inet.jitter_ms.toFixed(1)} ms` })
+    findings.push({ sev: 'warning', desc: t('findingHighInetJitter'), evidence: `${inet.jitter_ms.toFixed(1)} ms`, tip: t('tipHighInetJitter') })
   }
 
   if (inet.avg_ms > 80 && lan.avg_ms < 20) {
@@ -474,9 +475,9 @@ function runLocalAssessment(
   if (lastInternetDownload) {
     const dl = lastInternetDownload.mbps_avg
     if (dl < 5) {
-      findings.push({ sev: 'critical', desc: t('findingVerySlowDownload'), evidence: `${dl.toFixed(1)} Mbps` })
+      findings.push({ sev: 'critical', desc: t('findingVerySlowDownload'), evidence: `${dl.toFixed(1)} Mbps`, tip: t('tipVerySlowDownload') })
     } else if (dl < 25) {
-      findings.push({ sev: 'warning', desc: t('findingSlowDownload'), evidence: `${dl.toFixed(1)} Mbps` })
+      findings.push({ sev: 'warning', desc: t('findingSlowDownload'), evidence: `${dl.toFixed(1)} Mbps`, tip: t('tipSlowDownload') })
     } else {
       findings.push({ sev: 'ok', desc: t('findingGoodDownload'), evidence: `${dl.toFixed(1)} Mbps` })
     }
@@ -485,9 +486,9 @@ function runLocalAssessment(
   if (lastInternetUpload) {
     const ul = lastInternetUpload.mbps_avg
     if (ul < 2) {
-      findings.push({ sev: 'critical', desc: t('findingVerySlowUpload'), evidence: `${ul.toFixed(1)} Mbps` })
+      findings.push({ sev: 'critical', desc: t('findingVerySlowUpload'), evidence: `${ul.toFixed(1)} Mbps`, tip: t('tipVerySlowUpload') })
     } else if (ul < 10) {
-      findings.push({ sev: 'warning', desc: t('findingSlowUpload'), evidence: `${ul.toFixed(1)} Mbps` })
+      findings.push({ sev: 'warning', desc: t('findingSlowUpload'), evidence: `${ul.toFixed(1)} Mbps`, tip: t('tipSlowUpload') })
     } else {
       findings.push({ sev: 'ok', desc: t('findingGoodUpload'), evidence: `${ul.toFixed(1)} Mbps` })
     }
@@ -499,6 +500,7 @@ function runLocalAssessment(
       <div class="finding-text">
         ${f.desc}
         ${f.evidence ? `<div class="finding-evidence">${f.evidence}</div>` : ''}
+        ${f.tip ? `<div class="finding-tip">${f.tip}</div>` : ''}
       </div>
     </div>
   `).join('')

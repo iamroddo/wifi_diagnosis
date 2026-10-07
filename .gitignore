@@ -1,2 +1,17 @@
-.env
+# Go binary (produced by: make build / make build-dev)
+wifi-diagnostics
+
+# Frontend build output (produced by: make frontend)
+frontend/dist/
+
+# Frontend dependencies (installed by: npm ci)
 frontend/node_modules/
+
+# Runtime data directory (created at startup, cleaned by: make clean)
+data/
+
+# Environment config (copy from .env.example)
+.env
+
+# macOS
+.DS_Store
