@@ -82,6 +82,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/admin/", s.handleAdmin)
 	mux.HandleFunc("/api/admin/sessions", s.handleAdminSessions)
 
+	// UniFi client history
+	mux.HandleFunc("/api/unifi/history", s.handleUnifiHistory)
+
 	// Frontend (catch-all)
 	mux.Handle("/", http.FileServer(s.frontendFS))
 
@@ -150,6 +153,7 @@ func (s *Server) handleSessionGet(w http.ResponseWriter, r *http.Request) {
 	}
 	if snap.UnifiClient != nil {
 		cl := snap.UnifiClient
+		resp["client_mac"] = cl.MAC
 		resp["wifi"] = map[string]any{
 			"ssid":          cl.ESSID,
 			"ap_mac":        cl.APMAC,
@@ -297,4 +301,39 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		"contact_name":  s.contactName,
 		"contact_email": s.contactEmail,
 	})
+}
+
+func (s *Server) handleUnifiHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	mac := r.URL.Query().Get("mac")
+	if mac == "" {
+		http.Error(w, "mac parameter required", http.StatusBadRequest)
+		return
+	}
+
+	if s.unifiClient == nil {
+		http.Error(w, "unifi not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	samples, err := s.unifiClient.ClientHistory(ctx, mac)
+	if err != nil {
+		s.logger.Warn("unifi: history fetch failed", "mac", mac, "error", err)
+		http.Error(w, "failed to fetch history", http.StatusBadGateway)
+		return
+	}
+
+	if samples == nil {
+		samples = []unifi.HistorySample{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(samples) //nolint:errcheck
 }

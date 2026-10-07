@@ -55,6 +55,17 @@ func (c *Client) DisplayName() string {
 	return c.MAC
 }
 
+// HistorySample is one 5-minute bucket of per-client stats from the controller.
+type HistorySample struct {
+	Time         time.Time `json:"time"`
+	Signal       int       `json:"signal_dbm"`       // dBm (negative)
+	TXRate       int       `json:"tx_rate_bps"`      // bps
+	RXRate       int       `json:"rx_rate_bps"`      // bps
+	TXBytes      int64     `json:"tx_bytes"`
+	RXBytes      int64     `json:"rx_bytes"`
+	Satisfaction int       `json:"satisfaction"`     // 0–100, 0 = not reported
+}
+
 // UniFiClient is the interface for querying the UniFi controller.
 // Implementations must be safe for concurrent use.
 type UniFiClient interface {
@@ -62,6 +73,11 @@ type UniFiClient interface {
 	// or ErrNotFound if no matching active client exists.
 	// Returns ErrAmbiguous if multiple clients share the same IP.
 	FindClientByIP(ctx context.Context, ip string) (*Client, error)
+
+	// ClientHistory returns up to 30 minutes of 5-minute stat buckets for the
+	// given client MAC. Returns an empty slice (not an error) when the
+	// controller has no history for that client.
+	ClientHistory(ctx context.Context, mac string) ([]HistorySample, error)
 
 	// Ping verifies connectivity to the controller. Returns nil if reachable.
 	Ping(ctx context.Context) error

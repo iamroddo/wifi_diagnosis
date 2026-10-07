@@ -205,8 +205,36 @@ body {
 /* ===== Footer ===== */
 .footer { margin-top: 2rem; padding: 1rem 0; font-size: .8rem; color: var(--text-muted); text-align: center; }
 .contact-info a { color: var(--text-muted); }
+.footer-version { margin-top: .25rem; font-size: .75rem; opacity: .6; }
 .hidden { display: none; }
 
 /* ===== Progress bar ===== */
 .progress-bar-wrap { background: var(--border); border-radius: 4px; height: 6px; margin: .5rem 0; }
 .progress-bar      { height: 6px; border-radius: 4px; background: var(--accent); transition: width .2s; }
+
+/* ===== Wi-Fi History Charts ===== */
+.history-chart {
+  margin-bottom: 1.25rem;
+}
+.history-chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  margin-bottom: .25rem;
+}
+.history-chart-label {
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.history-chart-value {
+  font-weight: 600;
+  font-size: .9rem;
+}
+.history-chart-time {
+  font-size: .75rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}

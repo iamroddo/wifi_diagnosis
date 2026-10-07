@@ -9,6 +9,7 @@ export interface SessionResponse {
   session_id: string
   client_ip: string
   correlation_status: 'ok' | 'not_found' | 'ambiguous' | 'unavailable' | 'pending'
+  client_mac?: string
   wifi?: WiFiInfo
 }
 
@@ -24,6 +25,16 @@ export interface WiFiInfo {
   rx_rate_bps: number
   retries: number
   satisfaction: number
+}
+
+export interface HistorySample {
+  time: string          // RFC3339
+  signal_dbm: number
+  tx_rate_bps: number
+  rx_rate_bps: number
+  tx_bytes: number
+  rx_bytes: number
+  satisfaction: number  // 0 = not reported by controller
 }
 
 export interface LatencyResult {

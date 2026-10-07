@@ -7,7 +7,10 @@ import type {
   LatencyResult,
   ThroughputResult,
   Severity,
+  HistorySample,
 } from './types'
+
+declare const __APP_VERSION__: string
 
 // ---- DOM helpers ----
 
@@ -86,6 +89,8 @@ function applyTranslations() {
   el('section-connection-info').textContent = t('sectionConnectionInfo')
   el('section-wifi').textContent = t('sectionWifi')
   el('wifi-source-note').textContent = t('wifiSourceNote')
+  el('section-wifi-history').textContent = t('sectionWifiHistory')
+  el('wifi-history-source-note').textContent = t('wifiHistorySourceNote')
   el('section-lan').textContent = t('sectionLan')
   el('lan-source-note').textContent = t('lanSourceNote')
   el('section-throughput').textContent = t('sectionThroughput')
@@ -122,6 +127,10 @@ el('btn-lang-de').addEventListener('click', () => switchLang('de'))
 
 // Apply saved language on load
 switchLang(getLang())
+
+// Show build version in footer
+const versionEl = document.getElementById('app-version')
+if (versionEl) versionEl.textContent = `v${__APP_VERSION__}`
 
 el('btn-start').addEventListener('click', startDiagnostic)
 el('btn-stop').addEventListener('click', stopDiagnostic)
@@ -268,6 +277,10 @@ async function runDiagnostic(signal: AbortSignal) {
     lastWifi = sessionData.wifi ?? null
     if (sessionData.wifi) renderWifiInfo(sessionData.wifi)
     else el('wifi-info').innerHTML = `<p style="color:var(--text-muted)">${t('wifiUnavailable')}${sessionData.correlation_status})</p>`
+
+    if (sessionData.client_mac) {
+      fetchAndRenderHistory(sessionData.client_mac)
+    }
   }
 
   // 10. Local assessment
@@ -546,6 +559,111 @@ function sendReport() {
 
 function checkAbort(signal: AbortSignal) {
   if (signal.aborted) throw new Error('aborted')
+}
+
+// ---- Wi-Fi history / sparklines ----
+
+async function fetchAndRenderHistory(mac: string) {
+  try {
+    const resp = await fetch(`/api/unifi/history?mac=${encodeURIComponent(mac)}`)
+    if (!resp.ok) return
+    const samples = await resp.json() as HistorySample[]
+    if (!samples || samples.length === 0) {
+      el('wifi-history-group').classList.remove('hidden')
+      el('wifi-history').innerHTML = `<p style="color:var(--text-muted)">${t('wifiHistoryUnavailable')}</p>`
+      return
+    }
+    el('wifi-history-group').classList.remove('hidden')
+    renderHistory(samples)
+  } catch { /* non-fatal */ }
+}
+
+function sparkline(
+  values: number[],
+  opts: { color: string; yMin?: number; yMax?: number; height?: number; width?: number }
+): string {
+  const w = opts.width ?? 600
+  const h = opts.height ?? 60
+  const pad = 2
+  const raw = values.filter(v => v !== 0 && isFinite(v))
+  if (raw.length < 2) return ''
+
+  const lo = opts.yMin ?? Math.min(...raw)
+  const hi = opts.yMax ?? Math.max(...raw)
+  const range = hi - lo || 1
+
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (w - pad * 2)
+    const y = pad + (1 - (v - lo) / range) * (h - pad * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"
+    style="width:100%;height:${h}px;display:block;overflow:visible"
+    xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts.join(' ')}"
+      fill="none" stroke="${opts.color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`
+}
+
+function historyChart(
+  label: string,
+  values: number[],
+  times: Date[],
+  fmt: (v: number) => string,
+  color: string,
+  yMin?: number,
+  yMax?: number,
+): string {
+  if (values.every(v => v === 0)) return ''
+  const last = [...values].reverse().find((v: number) => v !== 0) ?? values[values.length - 1]
+  const lastTime = times[values.length - 1]
+  const timeStr = lastTime ? lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+  return `<div class="history-chart">
+    <div class="history-chart-header">
+      <span class="history-chart-label">${label}</span>
+      <span class="history-chart-value">${fmt(last)}</span>
+      <span class="history-chart-time">${timeStr}</span>
+    </div>
+    ${sparkline(values, { color, yMin, yMax })}
+  </div>`
+}
+
+function renderHistory(samples: HistorySample[]) {
+  const times = samples.map(s => new Date(s.time))
+  const signals = samples.map(s => s.signal_dbm)
+  const txRates = samples.map(s => s.tx_rate_bps)
+  const rxRates = samples.map(s => s.rx_rate_bps)
+  const satisfactions = samples.map(s => s.satisfaction)
+
+  const hasSatisfaction = satisfactions.some(v => v > 0)
+
+  let html = ''
+  html += historyChart(
+    t('wifiHistorySignal'), signals, times,
+    v => `${v} dBm`, 'var(--accent)',
+    Math.min(...signals.filter(Boolean)) - 5,
+    Math.max(...signals.filter(Boolean)) + 5,
+  )
+  html += historyChart(
+    t('wifiHistoryTxRate'), txRates, times,
+    v => formatRateKbps(v), '#4caf50',
+    0,
+  )
+  html += historyChart(
+    t('wifiHistoryRxRate'), rxRates, times,
+    v => formatRateKbps(v), '#2196f3',
+    0,
+  )
+  if (hasSatisfaction) {
+    html += historyChart(
+      t('wifiHistorySatisfaction'), satisfactions, times,
+      v => `${v}%`, '#ff9800',
+      0, 100,
+    )
+  }
+
+  el('wifi-history').innerHTML = html || `<p style="color:var(--text-muted)">${t('wifiHistoryUnavailable')}</p>`
 }
 
 function sleep(ms: number): Promise<void> {

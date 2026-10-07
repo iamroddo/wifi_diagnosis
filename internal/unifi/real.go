@@ -154,11 +154,32 @@ func (c *RealClient) fetchClients(ctx context.Context) ([]Client, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		// Session expired — force re-login on next call.
+		resp.Body.Close()
+		// Session expired — clear state and retry once with a fresh login.
 		c.mu.Lock()
 		c.loggedIn = false
 		c.mu.Unlock()
-		return nil, &UnavailableError{Cause: fmt.Errorf("session expired (HTTP %d)", resp.StatusCode)}
+		if err := c.ensureLoggedIn(ctx); err != nil {
+			return nil, err
+		}
+		req2, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, &UnavailableError{Cause: err}
+		}
+		req2.Header.Set("Accept", "application/json")
+		c.mu.Lock()
+		if c.csrfToken != "" {
+			req2.Header.Set("X-CSRF-Token", c.csrfToken)
+		}
+		c.mu.Unlock()
+		resp, err = c.httpClient.Do(req2)
+		if err != nil {
+			return nil, &UnavailableError{Cause: err}
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, &UnavailableError{Cause: fmt.Errorf("unexpected status %d after re-login", resp.StatusCode)}
+		}
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -335,6 +356,102 @@ func boolField(m map[string]any, key string) bool {
 	}
 	b, _ := v.(bool)
 	return b
+}
+
+func int64Field(m map[string]any, key string) int64 {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	}
+	return 0
+}
+
+// ClientHistory fetches 5-minute stat buckets for the given client MAC covering
+// approximately the last 30 minutes.
+func (c *RealClient) ClientHistory(ctx context.Context, mac string) ([]HistorySample, error) {
+	if err := c.ensureLoggedIn(ctx); err != nil {
+		return nil, err
+	}
+	if err := c.limiter.Wait(ctx); err != nil {
+		return nil, &UnavailableError{Cause: err}
+	}
+
+	end := time.Now()
+	start := end.Add(-30 * time.Minute)
+
+	payload, _ := json.Marshal(map[string]any{
+		"attrs": []string{"signal", "tx_rate", "rx_rate", "tx_bytes", "rx_bytes", "satisfaction"},
+		"start": start.Unix(),
+		"end":   end.Unix(),
+		"macs":  []string{mac},
+	})
+
+	url := fmt.Sprintf("%s/api/s/%s/stat/report/5minutes.user", c.cfg.BaseURL, c.cfg.Site)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, &UnavailableError{Cause: err}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	c.mu.Lock()
+	csrf := c.csrfToken
+	c.mu.Unlock()
+	if csrf != "" {
+		req.Header.Set("X-CSRF-Token", csrf)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, &UnavailableError{Cause: err}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body) //nolint:errcheck
+		return nil, &UnavailableError{Cause: fmt.Errorf("stat/report/5minutes.user returned HTTP %d", resp.StatusCode)}
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, &UnavailableError{Cause: err}
+	}
+
+	var envelope struct {
+		Data []map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, &UnavailableError{Cause: fmt.Errorf("JSON unmarshal: %w", err)}
+	}
+
+	samples := make([]HistorySample, 0, len(envelope.Data))
+	for _, d := range envelope.Data {
+		ts := int64Field(d, "time")
+		if ts == 0 {
+			continue
+		}
+		s := HistorySample{
+			Time:         time.Unix(ts, 0),
+			Signal:       intField(d, "signal"),
+			TXRate:       intField(d, "tx_rate"),
+			RXRate:       intField(d, "rx_rate"),
+			TXBytes:      int64Field(d, "tx_bytes"),
+			RXBytes:      int64Field(d, "rx_bytes"),
+			Satisfaction: intField(d, "satisfaction"),
+		}
+		samples = append(samples, s)
+	}
+
+	c.logger.Debug("unifi: fetched client history", "mac", mac, "samples", len(samples))
+	return samples, nil
 }
 
 // lookupAPName returns the device name for the given AP MAC, using a cached map.

@@ -4,6 +4,8 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm ci --prefer-offline
 COPY frontend/ ./
+ARG APP_VERSION=dev
+ENV VITE_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 # ---- Go build ----

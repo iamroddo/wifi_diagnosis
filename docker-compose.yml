@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     networks:
       wifi-diag-net:
-        ipv4_address: 192.168.1.250
+        ipv4_address: ${CONTAINER_IP}
       unifi-network-application_default:
     environment:
       UNIFI_URL: ${UNIFI_URL}
@@ -22,7 +22,7 @@ services:
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     extra_hosts:
-      - "unifi.roddo.net:172.19.0.3"
+      - "${UNIFI_HOSTNAME}:${UNIFI_INTERNAL_IP}"
     volumes:
       - /volume1/docker/wifi-diagnostics/data:/app/data
 
@@ -32,10 +32,10 @@ networks:
     # Create with:
     # docker network create \
     #   --driver macvlan \
-    #   --subnet=192.168.1.0/24 \
-    #   --gateway=192.168.1.1 \
-    #   --ip-range=192.168.1.250/31 \
-    #   --aux-address 'host=192.168.1.251' \
+    #   --subnet=${MACVLAN_SUBNET} \
+    #   --gateway=${MACVLAN_GATEWAY} \
+    #   --ip-range=${CONTAINER_IP}/31 \
+    #   --aux-address 'host=${MACVLAN_AUX_IP}' \
     #   --opt parent=eth0 \
     #   wifi-diag-net
   unifi-network-application_default:

@@ -52,6 +52,12 @@
         <div id="wifi-info" class="metric-grid"></div>
       </div>
 
+      <div class="result-group hidden" id="wifi-history-group">
+        <h2 id="section-wifi-history">Wi-Fi History (last 30 min)</h2>
+        <p id="wifi-history-source-note" class="source-note">5-minute averages from the UniFi controller.</p>
+        <div id="wifi-history"></div>
+      </div>
+
       <div class="result-group">
         <h2 id="section-lan">LAN Performance</h2>
         <p id="lan-source-note" class="source-note">Measured between your device and the diagnostic server on your local network.</p>
@@ -86,6 +92,7 @@
     <footer class="footer">
       <p id="footer-session"><span id="footer-session-label">Diagnostic session ID: </span><span id="session-id">—</span></p>
       <p id="contact-info" class="contact-info hidden"></p>
+      <p class="footer-version"><span id="app-version"></span></p>
     </footer>
   </div>
 
