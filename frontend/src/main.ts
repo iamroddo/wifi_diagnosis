@@ -580,7 +580,7 @@ async function fetchAndRenderHistory(mac: string) {
 
 function sparkline(
   values: number[],
-  opts: { color: string; yMin?: number; yMax?: number; height?: number; width?: number }
+  opts: { color: string; yMin?: number; yMax?: number; height?: number; width?: number; thresholds?: { value: number; color: string }[] }
 ): string {
   const w = opts.width ?? 600
   const h = opts.height ?? 60
@@ -598,34 +598,50 @@ function sparkline(
     return `${x.toFixed(1)},${y.toFixed(1)}`
   })
 
+  const thresholdLines = (opts.thresholds ?? [])
+    .filter(t => t.value >= lo && t.value <= hi)
+    .map(t => {
+      const y = (pad + (1 - (t.value - lo) / range) * (h - pad * 2)).toFixed(1)
+      return `<line x1="${pad}" y1="${y}" x2="${w - pad}" y2="${y}" stroke="${t.color}" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>`
+    }).join('')
+
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"
     style="width:100%;height:${h}px;display:block;overflow:visible"
     xmlns="http://www.w3.org/2000/svg">
+    ${thresholdLines}
     <polyline points="${pts.join(' ')}"
       fill="none" stroke="${opts.color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
   </svg>`
 }
 
-function historyChart(
-  label: string,
-  values: number[],
-  times: Date[],
-  fmt: (v: number) => string,
-  color: string,
-  yMin?: number,
-  yMax?: number,
-): string {
-  if (values.every(v => v === 0)) return ''
-  const last = [...values].reverse().find((v: number) => v !== 0) ?? values[values.length - 1]
-  const lastTime = times[values.length - 1]
+type HistoryMetricDef = {
+  label: string
+  description: string
+  values: number[]
+  times: Date[]
+  fmt: (v: number) => string
+  color: (v: number) => string
+  yMin?: number
+  yMax?: number
+  thresholds?: { value: number; color: string }[]
+}
+
+function historyChart(def: HistoryMetricDef): string {
+  if (def.values.every(v => v === 0)) return ''
+  const last = [...def.values].reverse().find((v: number) => v !== 0) ?? def.values[def.values.length - 1]
+  const lastTime = def.times[def.values.length - 1]
   const timeStr = lastTime ? lastTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+  const cls = def.color(last)
   return `<div class="history-chart">
     <div class="history-chart-header">
-      <span class="history-chart-label">${label}</span>
-      <span class="history-chart-value">${fmt(last)}</span>
+      <div class="history-chart-label-group">
+        <span class="history-chart-label">${def.label}</span>
+        <span class="history-chart-desc">${def.description}</span>
+      </div>
+      <span class="history-chart-value metric ${cls}">${def.fmt(last)}</span>
       <span class="history-chart-time">${timeStr}</span>
     </div>
-    ${sparkline(values, { color, yMin, yMax })}
+    ${sparkline(def.values, { color: `var(--${cls === 'ok' ? 'ok' : cls === 'warning' ? 'warning' : 'critical'})`, yMin: def.yMin, yMax: def.yMax, thresholds: def.thresholds })}
   </div>`
 }
 
@@ -638,29 +654,61 @@ function renderHistory(samples: HistorySample[]) {
 
   const hasSatisfaction = satisfactions.some(v => v > 0)
 
+  const signalColor = (v: number) => v > -65 ? 'ok' : v > -75 ? 'warning' : 'critical'
+  const rateColor = (v: number) => v > 50e6 ? 'ok' : v > 10e6 ? 'warning' : 'critical'
+  const satColor = (v: number) => v >= 80 ? 'ok' : v >= 50 ? 'warning' : 'critical'
+
   let html = ''
-  html += historyChart(
-    t('wifiHistorySignal'), signals, times,
-    v => `${v} dBm`, 'var(--accent)',
-    Math.min(...signals.filter(Boolean)) - 5,
-    Math.max(...signals.filter(Boolean)) + 5,
-  )
-  html += historyChart(
-    t('wifiHistoryTxRate'), txRates, times,
-    v => formatRateKbps(v), '#4caf50',
-    0,
-  )
-  html += historyChart(
-    t('wifiHistoryRxRate'), rxRates, times,
-    v => formatRateKbps(v), '#2196f3',
-    0,
-  )
+  html += historyChart({
+    label: t('wifiHistorySignal'),
+    description: t('wifiHistorySignalDesc'),
+    values: signals, times,
+    fmt: v => `${v} dBm`,
+    color: signalColor,
+    yMin: Math.min(...signals.filter(Boolean)) - 5,
+    yMax: Math.max(...signals.filter(Boolean)) + 5,
+    thresholds: [
+      { value: -65, color: 'var(--ok)' },
+      { value: -75, color: 'var(--warning)' },
+    ],
+  })
+  html += historyChart({
+    label: t('wifiHistoryTxRate'),
+    description: t('wifiHistoryTxRateDesc'),
+    values: txRates, times,
+    fmt: v => formatRateKbps(v),
+    color: rateColor,
+    yMin: 0,
+    thresholds: [
+      { value: 50e6, color: 'var(--ok)' },
+      { value: 10e6, color: 'var(--warning)' },
+    ],
+  })
+  html += historyChart({
+    label: t('wifiHistoryRxRate'),
+    description: t('wifiHistoryRxRateDesc'),
+    values: rxRates, times,
+    fmt: v => formatRateKbps(v),
+    color: rateColor,
+    yMin: 0,
+    thresholds: [
+      { value: 50e6, color: 'var(--ok)' },
+      { value: 10e6, color: 'var(--warning)' },
+    ],
+  })
   if (hasSatisfaction) {
-    html += historyChart(
-      t('wifiHistorySatisfaction'), satisfactions, times,
-      v => `${v}%`, '#ff9800',
-      0, 100,
-    )
+    html += historyChart({
+      label: t('wifiHistorySatisfaction'),
+      description: t('wifiHistorySatisfactionDesc'),
+      values: satisfactions, times,
+      fmt: v => `${v}%`,
+      color: satColor,
+      yMin: 0, yMax: 100,
+      thresholds: [
+        { value: 80, color: 'var(--ok)' },
+        { value: 50, color: 'var(--warning)' },
+      ],
+    })
   }
 
   el('wifi-history').innerHTML = html || `<p style="color:var(--text-muted)">${t('wifiHistoryUnavailable')}</p>`

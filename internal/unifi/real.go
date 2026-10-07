@@ -388,9 +388,7 @@ func (c *RealClient) ClientHistory(ctx context.Context, mac string) ([]HistorySa
 	start := end.Add(-30 * time.Minute)
 
 	payload, _ := json.Marshal(map[string]any{
-		"attrs": []string{"signal", "tx_rate", "rx_rate", "tx_bytes", "rx_bytes", "satisfaction"},
-		"start": start.Unix(),
-		"end":   end.Unix(),
+		"attrs": []string{"time", "signal", "tx_rate", "rx_rate", "tx_bytes", "rx_bytes", "satisfaction"},
 		"macs":  []string{mac},
 	})
 
@@ -434,12 +432,17 @@ func (c *RealClient) ClientHistory(ctx context.Context, mac string) ([]HistorySa
 
 	samples := make([]HistorySample, 0, len(envelope.Data))
 	for _, d := range envelope.Data {
-		ts := int64Field(d, "time")
-		if ts == 0 {
+		tsRaw := int64Field(d, "time")
+		if tsRaw == 0 {
+			continue
+		}
+		// UniFi returns time in milliseconds.
+		ts := time.Unix(tsRaw/1000, 0)
+		if ts.Before(start) {
 			continue
 		}
 		s := HistorySample{
-			Time:         time.Unix(ts, 0),
+			Time:         ts,
 			Signal:       intField(d, "signal"),
 			TXRate:       intField(d, "tx_rate"),
 			RXRate:       intField(d, "rx_rate"),
