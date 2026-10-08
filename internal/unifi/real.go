@@ -101,18 +101,45 @@ func (c *RealClient) FindClientByIP(ctx context.Context, ip string) (*Client, er
 	case 1:
 		// fall through to enrichment below
 	default:
-		for _, cl := range matches {
-			c.logger.Warn("unifi: ambiguous match detail",
-				"ip", ip,
-				"mac", cl.MAC,
-				"hostname", cl.Hostname,
-				"name", cl.Name,
-				"is_wired", cl.IsWired,
-				"essid", cl.ESSID,
-				"ap_mac", cl.APMAC,
-			)
+		// Multiple entries share the same IP — common when a device switches bands
+		// and the stale entry hasn't expired. Pick the most recently seen client.
+		best := matches[0]
+		for _, cl := range matches[1:] {
+			if cl.LastSeen.After(best.LastSeen) {
+				best = cl
+			}
 		}
-		return nil, &AmbiguousError{IP: ip, Count: len(matches)}
+		// Check all timestamps are distinct enough to trust the result.
+		ambiguous := true
+		for _, cl := range matches {
+			if cl.MAC != best.MAC && !cl.LastSeen.Equal(best.LastSeen) {
+				ambiguous = false
+				break
+			}
+		}
+		if ambiguous {
+			// Identical timestamps — can't disambiguate reliably.
+			for _, cl := range matches {
+				c.logger.Warn("unifi: ambiguous match detail",
+					"ip", ip,
+					"mac", cl.MAC,
+					"hostname", cl.Hostname,
+					"name", cl.Name,
+					"is_wired", cl.IsWired,
+					"essid", cl.ESSID,
+					"ap_mac", cl.APMAC,
+					"last_seen", cl.LastSeen,
+				)
+			}
+			return nil, &AmbiguousError{IP: ip, Count: len(matches)}
+		}
+		c.logger.Info("unifi: resolved ambiguous IP via last_seen",
+			"ip", ip,
+			"mac", best.MAC,
+			"essid", best.ESSID,
+			"last_seen", best.LastSeen,
+		)
+		matches = []Client{best}
 	}
 	cl := matches[0]
 	if cl.APMAC != "" {
@@ -306,6 +333,9 @@ func parseStaResponse(body []byte) ([]Client, error) {
 		cl := Client{
 			RawFields: fields,
 			LastSeen:  time.Now(),
+		}
+		if ts := int64Field(fields, "last_seen"); ts > 0 {
+			cl.LastSeen = time.Unix(ts, 0)
 		}
 
 		cl.MAC = stringField(fields, "mac")
