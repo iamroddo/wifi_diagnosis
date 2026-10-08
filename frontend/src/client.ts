@@ -135,7 +135,7 @@ export class DiagClient {
             const dur = (now - measuredStart) / 1000
             if (dur > 0) {
               const mbps = (measuredBytes * 8) / dur / 1e6
-              if (mbps > peakMbps) peakMbps = mbps
+              if (dur >= 1 && mbps > peakMbps) peakMbps = mbps
               onProgress?.(`Internet download: ${mbps.toFixed(1)} Mbps`)
             }
           }
@@ -166,8 +166,8 @@ export class DiagClient {
   async measureInternetUpload(onProgress?: OnProgress): Promise<ThroughputResult | null> {
     const DURATION_MS = 10_000
     const WARMUP_MS = 2_000
-    const PARALLEL = 3
-    const CHUNK_BYTES = 1_000_000 // 1 MB per POST — keeps RTT short and concurrency meaningful
+    const STREAMS = 6
+    const CHUNK_BYTES = 1_000_000
 
     const startT = performance.now()
     let warmupDone = false
@@ -175,35 +175,39 @@ export class DiagClient {
     let measuredStart = 0
     let peakMbps = 0
 
+    const recordChunk = () => {
+      const now = performance.now()
+      if (!warmupDone && now - startT >= WARMUP_MS) {
+        warmupDone = true
+        measuredStart = now
+        measuredBytes = 0
+      }
+      if (warmupDone) {
+        measuredBytes += CHUNK_BYTES
+        const dur = (now - measuredStart) / 1000
+        if (dur > 0) {
+          const mbps = (measuredBytes * 8) / dur / 1e6
+          if (dur >= 1 && mbps > peakMbps) peakMbps = mbps
+          onProgress?.(`Internet upload: ${mbps.toFixed(1)} Mbps`)
+        }
+      }
+    }
+
+    const chunk = new Uint8Array(CHUNK_BYTES)
     const runStream = async () => {
-      const chunk = new Uint8Array(CHUNK_BYTES)
       while (performance.now() - startT < DURATION_MS) {
         try {
-          await fetch('https://speed.cloudflare.com/__up', {
+          await fetch(`${this.baseUrl}/upload`, {
             method: 'POST',
-            body: new Blob([chunk]),
+            body: chunk,
             cache: 'no-store',
           })
-          const now = performance.now()
-          if (!warmupDone && now - startT >= WARMUP_MS) {
-            warmupDone = true
-            measuredStart = now
-            measuredBytes = 0
-          }
-          if (warmupDone) {
-            measuredBytes += CHUNK_BYTES
-            const dur = (now - measuredStart) / 1000
-            if (dur > 0) {
-              const mbps = (measuredBytes * 8) / dur / 1e6
-              if (mbps > peakMbps) peakMbps = mbps
-              onProgress?.(`Internet upload: ${mbps.toFixed(1)} Mbps`)
-            }
-          }
+          recordChunk()
         } catch { break }
       }
     }
 
-    await Promise.all(Array.from({ length: PARALLEL }, runStream))
+    await Promise.all(Array.from({ length: STREAMS }, runStream))
 
     const elapsed = (performance.now() - startT) / 1000
     if (!warmupDone) return null

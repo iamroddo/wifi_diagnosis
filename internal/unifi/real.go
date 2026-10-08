@@ -99,16 +99,28 @@ func (c *RealClient) FindClientByIP(ctx context.Context, ip string) (*Client, er
 	case 0:
 		return nil, &NotFoundError{IP: ip}
 	case 1:
-		cl := matches[0]
-		if cl.APMAC != "" {
-			if name, err := c.lookupAPName(ctx, cl.APMAC); err == nil {
-				cl.APName = name
-			}
-		}
-		return &cl, nil
+		// fall through to enrichment below
 	default:
+		for _, cl := range matches {
+			c.logger.Warn("unifi: ambiguous match detail",
+				"ip", ip,
+				"mac", cl.MAC,
+				"hostname", cl.Hostname,
+				"name", cl.Name,
+				"is_wired", cl.IsWired,
+				"essid", cl.ESSID,
+				"ap_mac", cl.APMAC,
+			)
+		}
 		return nil, &AmbiguousError{IP: ip, Count: len(matches)}
 	}
+	cl := matches[0]
+	if cl.APMAC != "" {
+		if name, err := c.lookupAPName(ctx, cl.APMAC); err == nil {
+			cl.APName = name
+		}
+	}
+	return &cl, nil
 }
 
 // fetchClients returns all active clients, using a short TTL cache.

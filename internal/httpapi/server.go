@@ -66,6 +66,7 @@ func (s *Server) Handler() http.Handler {
 	// HTTP fallbacks
 	mux.HandleFunc("/ping", diag.HTTPLatencyHandler)
 	mux.HandleFunc("/download", diag.HTTPDownloadHandler)
+	mux.HandleFunc("/upload", diag.HTTPUploadHandler)
 
 	// Session API
 	mux.HandleFunc("/api/session", s.handleSessionStart)

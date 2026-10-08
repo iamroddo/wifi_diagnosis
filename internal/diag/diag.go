@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -415,6 +416,18 @@ func HTTPDownloadHandler(w http.ResponseWriter, r *http.Request) {
 		total += int64(len(chunk))
 		flusher.Flush()
 	}
+}
+
+// HTTPUploadHandler reads and discards the request body, used as a same-origin
+// upload target so the browser is not subject to cross-origin buffering.
+func HTTPUploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	io.Copy(io.Discard, r.Body) //nolint:errcheck
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Ensure Handler is not accidentally value-copied.

@@ -9,7 +9,7 @@ const translations = {
     aboutItem1: 'Runs entirely in your browser — no app or extension needed',
     aboutItem2: 'No special browser permissions required',
     aboutItem3: 'Measures your connection to the local network and the internet',
-    aboutItem4: 'Approximate data transferred: <strong>~70 MB</strong> (download + upload tests)',
+    aboutItem4: 'Approximate data transferred: <strong>100 MB–500 MB</strong> depending on your connection speed (download + upload tests)',
     // Controls
     btnStart: 'Run Diagnostics',
     btnStop: 'Stop',
@@ -54,7 +54,7 @@ const translations = {
     sectionInternet: 'Internet',
     internetSourceNote: 'Latency from your device to the internet. A slow internet result with a healthy LAN result suggests a problem beyond the local network.',
     sectionInternetSpeed: 'Internet Speed',
-    internetSpeedSourceNote: 'Download and upload speed measured directly from your device to Cloudflare\'s servers.',
+    internetSpeedSourceNote: 'Download speed measured to Cloudflare\'s servers. Upload speed measured to the local diagnostic server (same-origin — avoids browser cross-origin buffering that would understate the result).',
     sectionAssessment: 'Assessment',
     // Metric labels
     metricIp: 'Your IP',
@@ -166,7 +166,7 @@ const translations = {
     aboutItem1: 'Läuft vollständig im Browser — keine App oder Erweiterung nötig',
     aboutItem2: 'Keine speziellen Browser-Berechtigungen erforderlich',
     aboutItem3: 'Misst die Verbindung zum lokalen Netzwerk und zum Internet',
-    aboutItem4: 'Ungefähr übertragene Datenmenge: <strong>~70 MB</strong> (Download- und Upload-Tests)',
+    aboutItem4: 'Ungefähr übertragene Datenmenge: <strong>100–500 MB</strong> je nach Verbindungsgeschwindigkeit (Download- und Upload-Tests)',
     // Controls
     btnStart: 'Diagnose starten',
     btnStop: 'Abbrechen',
@@ -211,7 +211,7 @@ const translations = {
     sectionInternet: 'Internet',
     internetSourceNote: 'Latenz von Ihrem Gerät zum Internet. Eine hohe Internet-Latenz bei gesundem LAN deutet auf ein Problem außerhalb des lokalen Netzwerks hin.',
     sectionInternetSpeed: 'Internet-Geschwindigkeit',
-    internetSpeedSourceNote: 'Download- und Upload-Geschwindigkeit direkt von Ihrem Gerät zu den Cloudflare-Servern gemessen.',
+    internetSpeedSourceNote: 'Download-Geschwindigkeit zu Cloudflare-Servern gemessen. Upload-Geschwindigkeit zum lokalen Diagnose-Server gemessen (gleiche Herkunft — vermeidet Cross-Origin-Pufferung im Browser, die das Ergebnis verfälschen würde).',
     sectionAssessment: 'Bewertung',
     // Metric labels
     metricIp: 'Ihre IP',
