@@ -1,6 +1,6 @@
 # Wi-Fi Diagnostics
 
-**Version:** 2026-10-08-b8ccb60
+**Version:** 2026-10-08-5b57190
 
 A browser-based Wi-Fi and network diagnostic tool — open **https://diag.roddo.net/** in any browser, no software installation or browser extensions needed.
 
