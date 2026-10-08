@@ -54,7 +54,7 @@ const translations = {
     sectionInternet: 'Internet',
     internetSourceNote: 'Latency from your device to the internet. A slow internet result with a healthy LAN result suggests a problem beyond the local network.',
     sectionInternetSpeed: 'Internet Speed',
-    internetSpeedSourceNote: 'Download speed measured to Cloudflare\'s servers. Upload speed measured to the local diagnostic server (same-origin — avoids browser cross-origin buffering that would understate the result).',
+    internetSpeedSourceNote: 'Download and upload speed measured directly from your device to Cloudflare\'s servers.',
     sectionAssessment: 'Assessment',
     // Metric labels
     metricIp: 'Your IP',
@@ -211,7 +211,7 @@ const translations = {
     sectionInternet: 'Internet',
     internetSourceNote: 'Latenz von Ihrem Gerät zum Internet. Eine hohe Internet-Latenz bei gesundem LAN deutet auf ein Problem außerhalb des lokalen Netzwerks hin.',
     sectionInternetSpeed: 'Internet-Geschwindigkeit',
-    internetSpeedSourceNote: 'Download-Geschwindigkeit zu Cloudflare-Servern gemessen. Upload-Geschwindigkeit zum lokalen Diagnose-Server gemessen (gleiche Herkunft — vermeidet Cross-Origin-Pufferung im Browser, die das Ergebnis verfälschen würde).',
+    internetSpeedSourceNote: 'Download- und Upload-Geschwindigkeit direkt von Ihrem Gerät zu den Cloudflare-Servern gemessen.',
     sectionAssessment: 'Bewertung',
     // Metric labels
     metricIp: 'Ihre IP',

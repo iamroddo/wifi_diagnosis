@@ -197,7 +197,7 @@ export class DiagClient {
     const runStream = async () => {
       while (performance.now() - startT < DURATION_MS) {
         try {
-          await fetch(`${this.baseUrl}/upload`, {
+          await fetch('https://speed.cloudflare.com/__up', {
             method: 'POST',
             body: chunk,
             cache: 'no-store',
