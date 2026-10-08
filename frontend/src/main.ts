@@ -86,6 +86,7 @@ function applyTranslations() {
   el<HTMLButtonElement>('btn-start').textContent = t('btnStart')
   el<HTMLButtonElement>('btn-stop').textContent = t('btnStop')
   el<HTMLButtonElement>('btn-send-report').textContent = t('btnSendReport')
+  el<HTMLButtonElement>('btn-download-report').textContent = t('btnDownloadReport')
   el('section-connection-info').textContent = t('sectionConnectionInfo')
   el('section-wifi').textContent = t('sectionWifi')
   el('wifi-source-note').textContent = t('wifiSourceNote')
@@ -135,6 +136,7 @@ if (versionEl) versionEl.textContent = `v${__APP_VERSION__}`
 el('btn-start').addEventListener('click', startDiagnostic)
 el('btn-stop').addEventListener('click', stopDiagnostic)
 el('btn-send-report').addEventListener('click', sendReport)
+el('btn-download-report').addEventListener('click', downloadReport)
 
 // Apply title from server config.
 fetch('/api/config')
@@ -171,10 +173,12 @@ async function startDiagnostic() {
   el<HTMLButtonElement>('btn-start').disabled = true
   el<HTMLButtonElement>('btn-stop').disabled = false
   el('btn-send-report').classList.add('hidden')
+  el('btn-download-report').classList.add('hidden')
   showResults()
 
   try {
     await runDiagnostic(abortController.signal)
+    el('btn-download-report').classList.remove('hidden')
     if (contactEmail) el('btn-send-report').classList.remove('hidden')
   } catch (err) {
     if ((err as Error).message !== 'aborted') {
@@ -546,6 +550,36 @@ function runLocalAssessment(
   `).join('')
 
   el('assessment').innerHTML = html || `<p>${t('noFindings')}</p>`
+}
+
+function buildReport() {
+  return {
+    _meta: {
+      tool: 'Wi-Fi Diagnostics',
+      version: __APP_VERSION__,
+      session_id: lastSessionId,
+      generated_at: new Date().toISOString(),
+      user_agent: navigator.userAgent,
+    },
+    wifi: lastWifi ?? null,
+    lan_latency: lastLanLatency ?? null,
+    local_download: lastDownload ?? null,
+    local_upload: lastUpload ?? null,
+    internet_latency: lastInternetLatency ?? null,
+    internet_download: lastInternetDownload ?? null,
+    internet_upload: lastInternetUpload ?? null,
+  }
+}
+
+function downloadReport() {
+  const json = JSON.stringify(buildReport(), null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `wifi-diagnostic-${lastSessionId || 'report'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function sendReport() {

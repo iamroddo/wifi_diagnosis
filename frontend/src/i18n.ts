@@ -14,6 +14,7 @@ const translations = {
     btnStart: 'Run Diagnostics',
     btnStop: 'Stop',
     btnSendReport: 'Send Report',
+    btnDownloadReport: 'Download Report',
     // Status messages
     statusReady: 'Ready to start',
     statusStopped: 'Stopped',
@@ -170,6 +171,7 @@ const translations = {
     btnStart: 'Diagnose starten',
     btnStop: 'Abbrechen',
     btnSendReport: 'Bericht senden',
+    btnDownloadReport: 'Bericht herunterladen',
     // Status messages
     statusReady: 'Bereit',
     statusStopped: 'Gestoppt',

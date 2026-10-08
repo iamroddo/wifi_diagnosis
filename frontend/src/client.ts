@@ -103,86 +103,121 @@ export class DiagClient {
 
   /** Measure internet download speed via Cloudflare speed test CDN. */
   async measureInternetDownload(onProgress?: OnProgress): Promise<ThroughputResult | null> {
-    const url = 'https://speed.cloudflare.com/__down?bytes=25000000'
-    const warmupMs = 2000
+    const DURATION_MS = 10_000
+    const WARMUP_MS = 2_000
+    const PARALLEL = 4
+    // 100 MB per stream — large enough that no stream finishes before the test ends at 250+ Mbps
+    const url = 'https://speed.cloudflare.com/__down?bytes=104857600'
 
-    const t0 = performance.now()
-    let totalBytes = 0
+    const startT = performance.now()
+    let warmupDone = false
+    let measuredBytes = 0
+    let measuredStart = 0
     let peakMbps = 0
+    const abort = new AbortController()
 
-    try {
-      const resp = await fetch(url, { cache: 'no-store' })
-      if (!resp.body) {
-        // Fallback: read as arrayBuffer if streaming not available
-        const buf = await resp.arrayBuffer()
-        totalBytes = buf.byteLength
-      } else {
+    const runStream = async () => {
+      try {
+        const resp = await fetch(url, { cache: 'no-store', signal: abort.signal })
+        if (!resp.body) return
         const reader = resp.body.getReader()
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          totalBytes += value.byteLength
-          const elapsed = performance.now() - t0
-          const mbps = (totalBytes * 8) / elapsed / 1000
-          if (mbps > peakMbps) peakMbps = mbps
-          onProgress?.(`Internet download: ${mbps.toFixed(1)} Mbps`)
+          const now = performance.now()
+          if (!warmupDone && now - startT >= WARMUP_MS) {
+            warmupDone = true
+            measuredStart = now
+            measuredBytes = 0
+          }
+          if (warmupDone) {
+            measuredBytes += value.byteLength
+            const dur = (now - measuredStart) / 1000
+            if (dur > 0) {
+              const mbps = (measuredBytes * 8) / dur / 1e6
+              if (mbps > peakMbps) peakMbps = mbps
+              onProgress?.(`Internet download: ${mbps.toFixed(1)} Mbps`)
+            }
+          }
+          if (now - startT >= DURATION_MS) { abort.abort(); break }
         }
-      }
-    } catch {
-      if (totalBytes === 0) return null
+      } catch { /* AbortError or network error — partial result is still used */ }
     }
 
-    const elapsed = (performance.now() - t0) / 1000
-    const warmupSecs = warmupMs / 1000
-    const measuredBytes = elapsed > warmupSecs
-      ? Math.max(0, totalBytes - Math.floor(totalBytes * warmupSecs / elapsed))
-      : totalBytes
-    const measuredDur = Math.max(0.1, elapsed > warmupSecs ? elapsed - warmupSecs : elapsed)
+    await Promise.all(Array.from({ length: PARALLEL }, runStream))
+
+    const elapsed = (performance.now() - startT) / 1000
+    if (!warmupDone) return null
+
+    const measuredDur = Math.max(0.1, (performance.now() - measuredStart) / 1000)
     const avgMbps = (measuredBytes * 8) / measuredDur / 1e6
-    if (peakMbps === 0) peakMbps = (totalBytes * 8) / elapsed / 1e6
+    if (peakMbps === 0) peakMbps = avgMbps
 
     return {
       mbps_avg: round2(avgMbps),
       mbps_peak: round2(peakMbps),
-      bytes_total: totalBytes,
+      bytes_total: measuredBytes,
       duration_secs: round2(elapsed),
-      warmup_ms: warmupMs,
+      warmup_ms: WARMUP_MS,
     }
   }
 
   /** Measure internet upload speed via Cloudflare speed test CDN. */
   async measureInternetUpload(onProgress?: OnProgress): Promise<ThroughputResult | null> {
-    const targetBytes = 10_000_000
-    const warmupMs = 1000
-    const chunk = new Uint8Array(targetBytes)
-    const blob = new Blob([chunk])
+    const DURATION_MS = 10_000
+    const WARMUP_MS = 2_000
+    const PARALLEL = 3
+    const CHUNK_BYTES = 1_000_000 // 1 MB per POST — keeps RTT short and concurrency meaningful
 
-    const t0 = performance.now()
-    try {
-      onProgress?.(`Internet upload: sending ${(targetBytes / 1e6).toFixed(0)} MB…`)
-      await fetch('https://speed.cloudflare.com/__up', {
-        method: 'POST',
-        body: blob,
-        cache: 'no-store',
-      })
-    } catch {
-      return null
+    const startT = performance.now()
+    let warmupDone = false
+    let measuredBytes = 0
+    let measuredStart = 0
+    let peakMbps = 0
+
+    const runStream = async () => {
+      const chunk = new Uint8Array(CHUNK_BYTES)
+      while (performance.now() - startT < DURATION_MS) {
+        try {
+          await fetch('https://speed.cloudflare.com/__up', {
+            method: 'POST',
+            body: new Blob([chunk]),
+            cache: 'no-store',
+          })
+          const now = performance.now()
+          if (!warmupDone && now - startT >= WARMUP_MS) {
+            warmupDone = true
+            measuredStart = now
+            measuredBytes = 0
+          }
+          if (warmupDone) {
+            measuredBytes += CHUNK_BYTES
+            const dur = (now - measuredStart) / 1000
+            if (dur > 0) {
+              const mbps = (measuredBytes * 8) / dur / 1e6
+              if (mbps > peakMbps) peakMbps = mbps
+              onProgress?.(`Internet upload: ${mbps.toFixed(1)} Mbps`)
+            }
+          }
+        } catch { break }
+      }
     }
 
-    const elapsed = (performance.now() - t0) / 1000
-    const warmupSecs = warmupMs / 1000
-    const measuredBytes = Math.max(0, targetBytes - Math.floor(targetBytes * warmupSecs / elapsed))
-    const measuredDur = Math.max(0.1, elapsed - warmupSecs)
-    const avgMbps = (measuredBytes * 8) / measuredDur / 1e6
-    const peakMbps = (targetBytes * 8) / elapsed / 1e6
+    await Promise.all(Array.from({ length: PARALLEL }, runStream))
 
-    onProgress?.(`Internet upload: ${avgMbps.toFixed(1)} Mbps`)
+    const elapsed = (performance.now() - startT) / 1000
+    if (!warmupDone) return null
+
+    const measuredDur = Math.max(0.1, (performance.now() - measuredStart) / 1000)
+    const avgMbps = (measuredBytes * 8) / measuredDur / 1e6
+    if (peakMbps === 0) peakMbps = avgMbps
+
     return {
       mbps_avg: round2(avgMbps),
       mbps_peak: round2(peakMbps),
-      bytes_total: targetBytes,
+      bytes_total: measuredBytes,
       duration_secs: round2(elapsed),
-      warmup_ms: warmupMs,
+      warmup_ms: WARMUP_MS,
     }
   }
 
