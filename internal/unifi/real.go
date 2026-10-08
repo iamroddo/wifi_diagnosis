@@ -102,23 +102,30 @@ func (c *RealClient) FindClientByIP(ctx context.Context, ip string) (*Client, er
 		// fall through to enrichment below
 	default:
 		// Multiple entries share the same IP — common when a device switches bands
-		// and the stale entry hasn't expired. Pick the most recently seen client.
+		// and the stale entry hasn't expired. Pick the most recently seen client,
+		// then break ties by highest uptime (longest continuous association).
 		best := matches[0]
 		for _, cl := range matches[1:] {
 			if cl.LastSeen.After(best.LastSeen) {
 				best = cl
+			} else if cl.LastSeen.Equal(best.LastSeen) {
+				if int64Field(cl.RawFields, "uptime") > int64Field(best.RawFields, "uptime") {
+					best = cl
+				}
 			}
 		}
-		// Check all timestamps are distinct enough to trust the result.
-		ambiguous := true
+		// Confirm best is strictly better than all others on at least one axis.
+		resolved := false
 		for _, cl := range matches {
-			if cl.MAC != best.MAC && !cl.LastSeen.Equal(best.LastSeen) {
-				ambiguous = false
+			if cl.MAC == best.MAC {
+				continue
+			}
+			if best.LastSeen.After(cl.LastSeen) || int64Field(best.RawFields, "uptime") > int64Field(cl.RawFields, "uptime") {
+				resolved = true
 				break
 			}
 		}
-		if ambiguous {
-			// Identical timestamps — can't disambiguate reliably.
+		if !resolved {
 			for _, cl := range matches {
 				c.logger.Warn("unifi: ambiguous match detail",
 					"ip", ip,
@@ -129,15 +136,17 @@ func (c *RealClient) FindClientByIP(ctx context.Context, ip string) (*Client, er
 					"essid", cl.ESSID,
 					"ap_mac", cl.APMAC,
 					"last_seen", cl.LastSeen,
+					"uptime", int64Field(cl.RawFields, "uptime"),
 				)
 			}
 			return nil, &AmbiguousError{IP: ip, Count: len(matches)}
 		}
-		c.logger.Info("unifi: resolved ambiguous IP via last_seen",
+		c.logger.Info("unifi: resolved ambiguous IP",
 			"ip", ip,
 			"mac", best.MAC,
 			"essid", best.ESSID,
 			"last_seen", best.LastSeen,
+			"uptime", int64Field(best.RawFields, "uptime"),
 		)
 		matches = []Client{best}
 	}
