@@ -1,6 +1,6 @@
 .PHONY: build build-dev test lint frontend frontend-dev frontend-install \
         docker-build docker-build-multiarch docker-run docker-run-dev \
-        deploy deploy-image deploy-files deploy-start deploy-restart deploy-status deploy-logs \
+        deploy deploy-image deploy-files deploy-network deploy-start deploy-restart deploy-status deploy-logs \
         clean
 
 # Load .env so NAS_IP, CONTAINER_IP etc. are available as make variables.
@@ -79,6 +79,16 @@ deploy-files:
 	ssh $(NAS) "mkdir -p $(NAS_DEPLOY_DIR)/data"
 	@echo "==> Copying compose file and .env..."
 	scp -O docker-compose.yml .env $(NAS):$(NAS_DEPLOY_DIR)/
+
+## Install the persistent host-side macvlan interface required by the NAS reverse proxy.
+deploy-network:
+	@echo "==> Installing persistent macvlan host route on the NAS..."
+	scp -O scripts/setup-macvlan-host.sh $(NAS):/tmp/wifi-diag-macvlan
+	ssh $(NAS) "sudo install -m 755 /tmp/wifi-diag-macvlan /usr/local/etc/rc.d/wifi-diag-macvlan.sh && \
+	  rm /tmp/wifi-diag-macvlan && \
+	  printf '%s\\n' 'PARENT_INTERFACE=eth0' 'HOST_INTERFACE=wifi-diag-host' 'HOST_IP=$(MACVLAN_AUX_IP)' 'CONTAINER_IP=$(CONTAINER_IP)' | \
+	  sudo tee /usr/local/etc/wifi-diag-macvlan.conf > /dev/null && \
+	  sudo /usr/local/etc/rc.d/wifi-diag-macvlan.sh start"
 
 ## Start the service on the NAS (no-op if already running).
 deploy-start:

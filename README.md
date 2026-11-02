@@ -72,7 +72,17 @@ cp .env.example .env
 #   UNIFI_HOSTNAME, UNIFI_INTERNAL_IP
 ```
 
-### 3. First-time deploy
+### 3. Enable NAS access to the macvlan container
+
+The Synology reverse proxy runs on the NAS host. A macvlan container cannot be reached directly by its host unless it has a host-side macvlan interface and a route to the container. Install this persistent route before the first deployment:
+
+```bash
+make deploy-network
+```
+
+It is restored automatically at NAS boot. Run the command again whenever `CONTAINER_IP` or `MACVLAN_AUX_IP` changes.
+
+### 4. First-time deploy
 
 Builds the image, streams it to the NAS, copies config, and starts the service:
 
@@ -87,6 +97,7 @@ make deploy
 | `make deploy` | Full redeploy — rebuild image, copy config, restart service |
 | `make deploy-image` | Build and push the image only |
 | `make deploy-files` | Copy `docker-compose.yml` and `.env` to the NAS only |
+| `make deploy-network` | Install or update the persistent NAS macvlan host route |
 | `make deploy-restart` | Restart the running service without rebuilding |
 | `make deploy-status` | Show container status on the NAS |
 | `make deploy-logs` | Tail live logs from the NAS (Ctrl-C to stop) |
@@ -154,6 +165,7 @@ make build
 | `make deploy` | Full redeploy — build image, copy config, restart service |
 | `make deploy-image` | Build linux/amd64 image and load it onto the NAS |
 | `make deploy-files` | Copy `docker-compose.yml` and `.env` to the NAS |
+| `make deploy-network` | Install or update the persistent NAS macvlan host route |
 | `make deploy-restart` | Stop and restart the service without rebuilding the image |
 | `make deploy-start` | Start the service if it is not running |
 | `make deploy-status` | Show container status on the NAS |
